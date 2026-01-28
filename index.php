@@ -1,54 +1,52 @@
 <?php
-    require __DIR__.'/vendor/autoload.php';
 
-    use \App\Entity\Vaga;
-    use \App\Db\Pagination;
-    use \App\Session\Login;
+require __DIR__ . '/vendor/autoload.php';
 
-    //OBRIGA O USUARIO A ESTAR LOGADO
-    Login::requireLogin();
+use \App\Entity\Vaga;
+use \App\Db\Pagination;
+use \App\Session\Login;
 
-    //BUSCA POR INPUT 
-    $busca = filter_input(INPUT_GET,'busca', FILTER_SANITIZE_STRING); 
+// Require user to be logged in
+Login::requireLogin();
 
-    //BUSCA POR SELECT
-    $filtroStatus = filter_input(INPUT_GET,'filtroStatus', FILTER_SANITIZE_STRING); 
-    $filtroStatus = in_array($filtroStatus,['s','n']) ? $filtroStatus : '';
-    
+// Get logged-in user info
+$usuarioLogado = Login::getUsuarioLogado();
 
+// Get search input (null-safe)
+$busca = filter_input(INPUT_GET, 'busca', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
 
-    //CONDIÇOES SQL
-    $condicoes = [
-         strlen($busca) ? 'titulo LIKE "%'.str_replace(' ','%',$busca).'%"' : null,
-         strlen($filtroStatus) ? 'ativo = "'.$filtroStatus.'"' : null
-    ];
+// Get status filter (null-safe)
+$filtroStatus = filter_input(INPUT_GET, 'filtroStatus', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
+$filtroStatus = in_array($filtroStatus, ['s', 'n']) ? $filtroStatus : '';
 
-    //REMOVE POSIÇOES VAZIAS
-    $condicoes = array_filter($condicoes);
-    
-    //CLAUSULA WHERE
-    $where = implode(' AND ', $condicoes);
+// Build WHERE conditions dynamically
+$condicoes = [];
 
+// Add search condition if provided
+if (!empty($busca)) {
+  $searchTerm = str_replace(' ', '%', addslashes($busca));
+  $condicoes[] = "titulo LIKE '%{$searchTerm}%'";
+}
 
-     
-    //QUANTIDADE TOTAL DE VAGAS
-    $quantidadeVagas = Vaga::getQuantidadeVagas($where);
+// Add status filter if provided
+if (!empty($filtroStatus)) {
+  $condicoes[] = "ativo = '{$filtroStatus}'";
+}
 
-    //Paginação
-    $obPagination = new Pagination($quantidadeVagas, $_GET['pagina'] ?? 1, 5);
-    
+// Combine conditions
+$where = !empty($condicoes) ? implode(' AND ', $condicoes) : null;
 
-    //OBTEM AS VAGAS
-    $vagas = Vaga::getVagas($where,null,null,$obPagination->getLimit());
+// Get total number of vacancies
+$quantidadeVagas = Vaga::getQuantidadeVagas($where);
 
-    
-    include __DIR__.'/includes/header.php';
+// Initialize pagination
+$paginaAtual = filter_input(INPUT_GET, 'pagina', FILTER_VALIDATE_INT) ?? 1;
+$obPagination = new Pagination($quantidadeVagas, $paginaAtual, 5);
 
-    include __DIR__.'/includes/listagem.php';
+// Get paginated vacancies
+$vagas = Vaga::getVagas($where, 'data DESC', $obPagination->getLimit());
 
-    include __DIR__.'/includes/footer.php';
-
-
-
-
-?>
+// Load templates
+include __DIR__ . '/includes/header.php';
+include __DIR__ . '/includes/listagem.php';
+include __DIR__ . '/includes/footer.php';

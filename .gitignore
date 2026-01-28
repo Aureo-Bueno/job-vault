@@ -1,0 +1,4 @@
+echo "logs/*.log
+vendor/
+.env
+

@@ -1,13 +1,11 @@
 <?php
 require __DIR__ . '/vendor/autoload.php';
 
-use \App\Entity\Usuario;
-use \App\Session\Login;
-
+use App\Entity\Usuario;
+use App\Session\Login;
 
 $alertaLogin = "";
 $alertaCadastro = "";
-
 
 Login::requireLogout();
 
@@ -19,12 +17,11 @@ if (isset($_POST['acao'])) {
         $alertaLogin = "Email ou Senha Inválidos";
         break;
       }
-
       Login::login($obUsuario);
+      break;
 
     case 'cadastrar':
       if (isset($_POST['nome'], $_POST['email'], $_POST['senha'])) {
-
         $obUsuario = Usuario::getUsuariosEmail($_POST['email']);
         if ($obUsuario instanceof Usuario) {
           $alertaCadastro = "O Email digitado já está em uso";
@@ -43,7 +40,5 @@ if (isset($_POST['acao'])) {
 }
 
 include __DIR__ . '/includes/header.php';
-
 include __DIR__ . '/includes/formulario-login.php';
-
 include __DIR__ . '/includes/footer.php';

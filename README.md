@@ -30,39 +30,57 @@ A modern, dockerized job vacancy management platform built with PHP, MySQL, and 
 
 ```
 JobVault/
-├── app/
-│   ├── Db/
-│   │   ├── Database.php          # PDO database abstraction layer
-│   │   └── Pagination.php        # Pagination logic
-│   ├── Entity/
-│   │   ├── Usuario.php           # User entity (authentication)
-│   │   └── Vaga.php              # Job vacancy entity
-│   ├── Session/
-│   │   └── Login.php             # Session management
-│   └── Util/
-│       └── Logger.php            # Application logging
-├── includes/
-│   ├── header.php                # Page header template
-│   ├── footer.php                # Page footer template
-│   ├── formulario-login.php      # Login/register form
-│   ├── formulario.php            # Vacancy form
-│   ├── listagem.php              # Vacancy listing template
-│   └── confirmar-exlusao.php     # Deletion confirmation
-├── vendor/                        # Composer dependencies
-├── logs/                          # Application logs (created by Docker)
-├── index.php                      # Home page (vacancy listing)
-├── login.php                      # Login/register page
-├── logout.php                     # Logout handler
-├── cadastrar.php                  # Create vacancy page
-├── editar.php                     # Edit vacancy page
-├── excluir.php                    # Delete vacancy page
-├── init.sql                       # Database initialization script
-├── sistem_vagas.sql               # Additional schema
-├── docker-compose.yml             # Docker Compose configuration
-├── Dockerfile                     # PHP/Apache Docker image
-├── composer.json                  # PHP dependencies
-├── composer.lock                  # Locked dependencies
-└── README.md                      # This file
+┣ 📂app
+ ┃ ┣ 📂Db
+ ┃ ┃ ┣ 📜Database.php
+ ┃ ┃ ┗ 📜Pagination.php
+ ┃ ┣ 📂Entity
+ ┃ ┃ ┣ 📜Permission.php
+ ┃ ┃ ┣ 📜Role.php
+ ┃ ┃ ┣ 📜RolePermission.php
+ ┃ ┃ ┣ 📜Usuario.php
+ ┃ ┃ ┗ 📜Vaga.php
+ ┃ ┣ 📂Session
+ ┃ ┃ ┗ 📜Login.php
+ ┃ ┗ 📂Util
+ ┃ ┃ ┣ 📜Logger.php
+ ┃ ┃ ┗ 📜RoleManager.php
+ ┣ 📂includes
+ ┃ ┣ 📜confirmar-exlusao.php
+ ┃ ┣ 📜footer.php
+ ┃ ┣ 📜formulario-login.php
+ ┃ ┣ 📜formulario.php
+ ┃ ┣ 📜header.php
+ ┃ ┗ 📜listagem.php
+ ┣ 📂init.sql
+ ┣ 📂roles_schema.sql
+ ┣ 📂vendor
+ ┃ ┣ 📂composer
+ ┃ ┃ ┣ 📜ClassLoader.php
+ ┃ ┃ ┣ 📜InstalledVersions.php
+ ┃ ┃ ┣ 📜LICENSE
+ ┃ ┃ ┣ 📜autoload_classmap.php
+ ┃ ┃ ┣ 📜autoload_namespaces.php
+ ┃ ┃ ┣ 📜autoload_psr4.php
+ ┃ ┃ ┣ 📜autoload_real.php
+ ┃ ┃ ┣ 📜autoload_static.php
+ ┃ ┃ ┣ 📜installed.json
+ ┃ ┃ ┗ 📜installed.php
+ ┃ ┗ 📜autoload.php
+ ┣ 📜.editorconfig
+ ┣ 📜.gitignore
+ ┣ 📜Dockerfile
+ ┣ 📜README.md
+ ┣ 📜cadastrar.php
+ ┣ 📜composer.json
+ ┣ 📜composer.lock
+ ┣ 📜docker-compose.yml
+ ┣ 📜editar.php
+ ┣ 📜excluir.php
+ ┣ 📜index.php
+ ┣ 📜login.php
+ ┣ 📜logout.php
+ ┗ 📜setup.sql
 ```
 
 ---

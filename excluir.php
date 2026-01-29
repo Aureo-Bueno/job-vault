@@ -1,10 +1,16 @@
 <?php
 require __DIR__ . '/vendor/autoload.php';
 
-use \App\Entity\Vaga;
 use \App\Session\Login;
+use \App\Util\RoleManager;
+use \App\Entity\Vaga;
 
+// Require login
 Login::requireLogin();
+$usuarioId = Login::getUsuarioLogado()['id'];
+
+// Check permission to delete
+RoleManager::requirePermission($usuarioId, 'vaga.deletar');
 
 
 if (!isset($_GET['id']) or !is_numeric($_GET['id'])) {

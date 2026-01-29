@@ -73,7 +73,7 @@ class Login
    *
    * Creates session with user data and redirects to index.
    *
-   * @param object $obUsuario User object with id, nome, email properties
+   * @param object $obUsuario User object with id, nome, email, role_id properties
    * @return void Redirects to index.php
    */
   public static function login($obUsuario)
@@ -84,16 +84,17 @@ class Login
     $_SESSION['usuario'] = [
       'id' => $obUsuario->id,
       'nome' => $obUsuario->nome,
-      'email' => $obUsuario->email
+      'email' => $obUsuario->email,
+      'role_id' => $obUsuario->role_id ?? null  // ← Handle null safely
     ];
 
-    // Log successful login AFTER redirect is sent
-    // (This happens in background after page loads)
+    // Log successful login AFTER redirect is sent (in background)
     register_shutdown_function(function () use ($obUsuario) {
       self::initLogger();
       self::$logger->info('User logged in', [
         'user_id' => $obUsuario->id,
         'email' => $obUsuario->email,
+        'role_id' => $obUsuario->role_id,
         'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
       ]);
     });

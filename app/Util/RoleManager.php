@@ -2,9 +2,8 @@
 
 namespace App\Util;
 
-use App\Entity\Role;
-use App\Entity\RolePermission;
-use App\Entity\Usuario;
+use App\Application\Service\RoleService;
+use App\Infrastructure\Container\AppContainer;
 
 /**
  * Role and Permission Manager
@@ -16,23 +15,17 @@ use App\Entity\Usuario;
  */
 class RoleManager
 {
+  private static function service(): RoleService
+  {
+    return AppContainer::roleService();
+  }
+
   /**
    * Check if user has a specific permission
    */
   public static function hasPermission($userId, $permissionName)
   {
-    try {
-      $usuario = Usuario::getUsuarioById($userId);
-
-      if (!$usuario || !isset($usuario->role_id) || is_null($usuario->role_id)) {
-        return false;
-      }
-
-      return RolePermission::roleHasPermission($usuario->role_id, $permissionName);
-    } catch (\Exception $e) {
-      error_log('RoleManager error: ' . $e->getMessage());
-      return false;
-    }
+    return self::service()->hasPermission((int) $userId, $permissionName);
   }
 
   /**
@@ -40,19 +33,7 @@ class RoleManager
    */
   public static function getPermissionsByRole($roleId)
   {
-    try {
-      $permissions = RolePermission::getPermissionsByRoleId($roleId);
-
-      $permissionNames = [];
-      foreach ($permissions as $permission) {
-        $permissionNames[] = $permission->nome;
-      }
-
-      return $permissionNames;
-    } catch (\Exception $e) {
-      error_log('RoleManager error: ' . $e->getMessage());
-      return [];
-    }
+    return self::service()->getPermissionsByRole((int) $roleId);
   }
 
   /**
@@ -60,18 +41,7 @@ class RoleManager
    */
   public static function getUserRole($userId)
   {
-    try {
-      $usuario = Usuario::getUsuarioById($userId);
-
-      if (!$usuario || !isset($usuario->role_id)) {
-        return null;
-      }
-
-      return Role::getRoleById($usuario->role_id);
-    } catch (\Exception $e) {
-      error_log('RoleManager error: ' . $e->getMessage());
-      return null;
-    }
+    return self::service()->getUserRole((int) $userId);
   }
 
   /**
@@ -79,8 +49,7 @@ class RoleManager
    */
   public static function isAdmin($userId)
   {
-    $role = self::getUserRole($userId);
-    return $role && $role->nome === 'admin';
+    return self::service()->isAdmin((int) $userId);
   }
 
   /**
@@ -88,8 +57,7 @@ class RoleManager
    */
   public static function isGestor($userId)
   {
-    $role = self::getUserRole($userId);
-    return $role && $role->nome === 'gestor';
+    return self::service()->isGestor((int) $userId);
   }
 
   /**
@@ -97,9 +65,6 @@ class RoleManager
    */
   public static function requirePermission($userId, $permissionName)
   {
-    if (!self::hasPermission($userId, $permissionName)) {
-      http_response_code(403);
-      die('Você não tem permissão para acessar este recurso.');
-    }
+    self::service()->requirePermission((int) $userId, $permissionName);
   }
 }

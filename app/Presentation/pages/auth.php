@@ -13,24 +13,24 @@ $authService->requireLogout();
 if (isset($_POST['acao'])) {
   switch ($_POST['acao']) {
     case 'logar':
-      $obUsuario = $authService->authenticate($_POST['email'], $_POST['senha']);
-      if (!$obUsuario) {
+      $user = $authService->authenticate($_POST['email'], $_POST['password']);
+      if (!$user) {
         $alertaLogin = "Email ou Senha Inválidos";
         break;
       }
-      $authService->login($obUsuario);
+      $authService->login($user);
       break;
 
     case 'cadastrar':
-      if (isset($_POST['nome'], $_POST['email'], $_POST['senha'])) {
-        $resultadoCadastro = $authService->register($_POST['nome'], $_POST['email'], $_POST['senha']);
-        $obUsuario = $resultadoCadastro['user'] ?? null;
-        if (!$obUsuario) {
-          $alertaCadastro = $resultadoCadastro['error'] ?? 'Não foi possível criar o usuário';
+      if (isset($_POST['name'], $_POST['email'], $_POST['password'])) {
+        $registerResult = $authService->register($_POST['name'], $_POST['email'], $_POST['password']);
+        $user = $registerResult['user'] ?? null;
+        if (!$user) {
+          $alertaCadastro = $registerResult['error'] ?? 'Não foi possível criar o usuário';
           break;
         }
 
-        $authService->login($obUsuario);
+        $authService->login($user);
       }
       break;
   }

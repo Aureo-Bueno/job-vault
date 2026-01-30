@@ -4,12 +4,16 @@ use App\Infrastructure\Container\AppContainer;
 use App\Util\RoleManager;
 
 $authService = AppContainer::authService();
-$usuarioLogado = $authService->getUsuarioLogado();
-$podeVerUsuarios = $usuarioLogado ? RoleManager::hasPermission($usuarioLogado['id'], 'usuario.listar') : false;
+$loggedUser = $authService->getLoggedUser();
+$userId = $loggedUser['id'] ?? null;
+$canViewUsers = $userId ? RoleManager::hasPermission($userId, 'user.list') : false;
+$canCreateVacancy = $userId ? RoleManager::hasPermission($userId, 'vacancy.create') : false;
+$canManageVacancies = $userId ? (RoleManager::isAdmin($userId) || RoleManager::isManager($userId)) : false;
+$homeRoute = $loggedUser && !$canManageVacancies ? 'vacancies/apply' : 'home';
 
-if ($usuarioLogado) {
-  $role = RoleManager::getUserRole($usuarioLogado['id']);
-  $roleName = $role ? $role->nome : 'Sem role';
+if ($loggedUser) {
+  $role = RoleManager::getUserRole($loggedUser['id']);
+  $roleName = $role ? $role->name : 'Sem role';
 
   // Badge colors by role
   $badgeClass = match ($roleName) {
@@ -359,7 +363,7 @@ if ($usuarioLogado) {
   <nav class="navbar navbar-expand-lg navbar-dark navbar-custom">
     <div class="container-fluid px-4">
       <!-- Brand -->
-      <a class="navbar-brand" href="index.php?r=home">
+      <a class="navbar-brand" href="index.php?r=<?= htmlspecialchars($homeRoute) ?>">
         <i class="bi bi-briefcase-fill"></i>
         JobVault
       </a>
@@ -373,32 +377,41 @@ if ($usuarioLogado) {
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ms-auto align-items-lg-center gap-1">
           <li class="nav-item">
-            <a class="nav-link" href="index.php?r=home">
+            <a class="nav-link" href="index.php?r=<?= htmlspecialchars($homeRoute) ?>">
               <i class="bi bi-house-fill"></i> Home
             </a>
           </li>
-          <li class="nav-item">
-            <a class="nav-link" href="index.php?r=vagas/novo">
-              <i class="bi bi-plus-circle-fill"></i> Nova Vaga
-            </a>
-          </li>
-          <?php if ($podeVerUsuarios) : ?>
+          <?php if ($loggedUser && !$canManageVacancies) : ?>
             <li class="nav-item">
-              <a class="nav-link" href="index.php?r=usuarios">
+              <a class="nav-link" href="index.php?r=vacancies/apply">
+                <i class="bi bi-send-check-fill"></i> Candidatar
+              </a>
+            </li>
+          <?php endif; ?>
+          <?php if ($canCreateVacancy) : ?>
+            <li class="nav-item">
+              <a class="nav-link" href="index.php?r=vacancies/new">
+                <i class="bi bi-plus-circle-fill"></i> Nova Vaga
+              </a>
+            </li>
+          <?php endif; ?>
+          <?php if ($canViewUsers) : ?>
+            <li class="nav-item">
+              <a class="nav-link" href="index.php?r=users">
                 <i class="bi bi-people-fill"></i> Usuários
               </a>
             </li>
           <?php endif; ?>
           <!-- User Info / Login -->
           <li class="nav-item">
-            <?php if ($usuarioLogado) : ?>
+            <?php if ($loggedUser) : ?>
               <div class="user-info">
                 <div class="user-avatar">
-                  <?= substr($usuarioLogado['nome'], 0, 1) ?>
+                  <?= substr($loggedUser['name'], 0, 1) ?>
                 </div>
                 <div>
                   <div class="text-white fw-bold">
-                    <?= htmlspecialchars($usuarioLogado['nome']) ?>
+                    <?= htmlspecialchars($loggedUser['name']) ?>
                   </div>
                   <span class="role-badge <?= $badgeClass ?>">
                     <i class="bi bi-shield-fill"></i>
@@ -430,7 +443,7 @@ if ($usuarioLogado) {
           </h1>
           <p class="mb-0">Sistema de Gerenciamento de Vagas</p>
         </div>
-        <?php if ($usuarioLogado && $role) : ?>
+        <?php if ($loggedUser && $role) : ?>
           <div class="text-end">
             <small class="text-muted d-block">Seu Nível:</small>
             <span class="role-badge role-badge-lg <?= $badgeClass ?>">

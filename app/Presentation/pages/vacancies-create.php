@@ -1,23 +1,27 @@
 <?php
 require BASE_PATH . '/vendor/autoload.php';
 
-use App\Domain\Model\Vaga;
+use App\Domain\Model\Vacancy;
 use App\Infrastructure\Container\AppContainer;
 use App\Presentation\View;
+use App\Util\RoleManager;
 
-$tituloPagina = 'Cadastrar Vaga';
+$pageTitle = 'Cadastrar Vaga';
 
 $authService = AppContainer::authService();
 $authService->requireLogin();
+$userId = $authService->getLoggedUser()['id'];
 
-$vagaService = AppContainer::vagaService();
-$obVaga = new Vaga();
+RoleManager::requirePermission($userId, 'vacancy.create');
 
-if (isset($_POST['titulo'], $_POST['descricao'], $_POST['ativo'])) {
-  $obVaga->titulo   = $_POST['titulo'];
-  $obVaga->descricao = $_POST['descricao'];
-  $obVaga->ativo    = $_POST['ativo'];
-  $vagaService->create($obVaga);
+$vacancyService = AppContainer::vacancyService();
+$vacancy = new Vacancy();
+
+if (isset($_POST['title'], $_POST['description'], $_POST['is_active'])) {
+  $vacancy->title   = $_POST['title'];
+  $vacancy->description = $_POST['description'];
+  $vacancy->isActive    = $_POST['is_active'];
+  $vacancyService->create($vacancy);
 
   header('location: index.php?r=home&status=success');
   exit;
@@ -25,7 +29,7 @@ if (isset($_POST['titulo'], $_POST['descricao'], $_POST['ativo'])) {
 
 View::render(VIEW_PATH . '/layout/header.php');
 View::render(VIEW_PATH . '/pages/vacancy-form.php', [
-  'obVaga' => $obVaga,
-  'tituloPagina' => $tituloPagina
+  'vacancy' => $vacancy,
+  'tituloPagina' => $pageTitle
 ]);
 View::render(VIEW_PATH . '/layout/footer.php');

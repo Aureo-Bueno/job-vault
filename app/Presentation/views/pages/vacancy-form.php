@@ -26,16 +26,16 @@ $tituloFormulario = $tituloPagina ?? (defined('TITLE') ? TITLE : '');
 
         <!-- Título -->
         <div class="mb-4">
-          <label for="titulo" class="form-label text-white fw-bold">
+          <label for="title" class="form-label text-white fw-bold">
             <i class="bi bi-file-earmark-text"></i> Título da Vaga
           </label>
           <input
             type="text"
             class="form-control form-control-lg"
-            id="titulo"
-            name="titulo"
+            id="title"
+            name="title"
             placeholder="Ex: Desenvolvedor PHP Senior"
-            value="<?= htmlspecialchars($obVaga->titulo ?? '') ?>"
+            value="<?= htmlspecialchars($vacancy->title ?? '') ?>"
             required>
           <div class="invalid-feedback text-danger d-block">
             Por favor, informe um título para a vaga.
@@ -47,16 +47,16 @@ $tituloFormulario = $tituloPagina ?? (defined('TITLE') ? TITLE : '');
 
         <!-- Descrição -->
         <div class="mb-4">
-          <label for="descricao" class="form-label text-white fw-bold">
+          <label for="description" class="form-label text-white fw-bold">
             <i class="bi bi-file-text"></i> Descrição da Vaga
           </label>
           <textarea
             class="form-control"
-            id="descricao"
-            name="descricao"
+            id="description"
+            name="description"
             rows="8"
             placeholder="Descreva os detalhes da vaga, responsabilidades, requisitos..."
-            required><?= htmlspecialchars($obVaga->descricao ?? '') ?></textarea>
+            required><?= htmlspecialchars($vacancy->description ?? '') ?></textarea>
           <div class="invalid-feedback text-danger d-block">
             Por favor, informe uma descrição para a vaga.
           </div>
@@ -74,22 +74,22 @@ $tituloFormulario = $tituloPagina ?? (defined('TITLE') ? TITLE : '');
             <input
               type="radio"
               class="btn-check"
-              name="ativo"
-              id="ativo-sim"
+              name="is_active"
+              id="active-yes"
               value="s"
-              <?= ($obVaga->ativo ?? 's') == 's' ? 'checked' : '' ?>>
-            <label class="btn btn-outline-success fw-bold" for="ativo-sim">
+              <?= ($vacancy->isActive ?? 's') == 's' ? 'checked' : '' ?>>
+            <label class="btn btn-outline-success fw-bold" for="active-yes">
               <i class="bi bi-check-circle-fill"></i> Ativa
             </label>
 
             <input
               type="radio"
               class="btn-check"
-              name="ativo"
-              id="ativo-nao"
+              name="is_active"
+              id="active-no"
               value="n"
-              <?= ($obVaga->ativo ?? '') == 'n' ? 'checked' : '' ?>>
-            <label class="btn btn-outline-danger fw-bold" for="ativo-nao">
+              <?= ($vacancy->isActive ?? '') == 'n' ? 'checked' : '' ?>>
+            <label class="btn btn-outline-danger fw-bold" for="active-no">
               <i class="bi bi-x-circle-fill"></i> Inativa
             </label>
           </div>

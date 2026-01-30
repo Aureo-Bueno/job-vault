@@ -7,7 +7,7 @@ use \App\Util\Logger;
 use \PDO;
 
 /**
- * Vaga (Job Vacancy) Entity Class
+ * Vacancy Entity Class
  *
  * Represents a job vacancy with CRUD operations.
  * Handles vacancy creation, updates, deletion, and queries.
@@ -15,7 +15,7 @@ use \PDO;
  * @package App\Entity
  * @version 2.0
  */
-class Vaga
+class Vacancy
 {
   /**
    * Unique vacancy identifier
@@ -29,28 +29,28 @@ class Vaga
    *
    * @var string
    */
-  public $titulo;
+  public $title;
 
   /**
    * Job description
    *
    * @var string
    */
-  public $descricao;
+  public $description;
 
   /**
    * Vacancy status (s=active, n=inactive)
    *
    * @var string
    */
-  public $ativo;
+  public $is_active;
 
   /**
    * Publication date and time
    *
    * @var string
    */
-  public $data;
+  public $created_at;
 
   /**
    * Application logger
@@ -67,7 +67,7 @@ class Vaga
   private static function initLogger()
   {
     if (!isset(self::$logger)) {
-      self::$logger = new Logger('vaga');
+      self::$logger = new Logger('vacancy');
     }
   }
 
@@ -78,41 +78,41 @@ class Vaga
    * Logs the creation event.
    *
    * Example:
-   *   $vaga = new Vaga();
-   *   $vaga->titulo = 'PHP Developer';
-   *   $vaga->descricao = 'Senior PHP developer...';
-   *   $vaga->ativo = 's';
-   *   $vaga->cadastrar();
+   *   $vacancy = new Vacancy();
+   *   $vacancy->title = 'PHP Developer';
+   *   $vacancy->description = 'Senior PHP developer...';
+   *   $vacancy->is_active = 's';
+   *   $vacancy->create();
    *
    * @return bool Always returns true on success
    * @throws PDOException If insert fails
    */
-  public function cadastrar()
+  public function create()
   {
     self::initLogger();
 
     try {
-      $this->data = date('Y-m-d H:i:s');
+      $this->created_at = date('Y-m-d H:i:s');
 
-      $obDatabase = new Database('vagas');
+      $obDatabase = new Database('vacancies');
       $this->id = $obDatabase->insert([
-        'titulo' => $this->titulo,
-        'descricao' => $this->descricao,
-        'ativo' => $this->ativo,
-        'data' => $this->data
+        'title' => $this->title,
+        'description' => $this->description,
+        'is_active' => $this->is_active,
+        'created_at' => $this->created_at
       ]);
 
       self::$logger->info('New vacancy created', [
         'vacancy_id' => $this->id,
-        'title' => $this->titulo,
-        'status' => $this->ativo
+        'title' => $this->title,
+        'status' => $this->is_active
       ]);
 
       return true;
     } catch (\PDOException $e) {
       self::$logger->error('Failed to create vacancy', [
         'error' => $e->getMessage(),
-        'title' => $this->titulo
+        'title' => $this->title
       ]);
       throw $e;
     }
@@ -125,28 +125,28 @@ class Vaga
    * Logs the update event.
    *
    * Example:
-   *   $vaga = Vaga::getVaga(1);
-   *   $vaga->titulo = 'Updated Title';
-   *   $vaga->atualizar();
+   *   $vacancy = Vacancy::getVacancy(1);
+   *   $vacancy->title = 'Updated Title';
+   *   $vacancy->update();
    *
    * @return bool True on success
    * @throws PDOException If update fails
    */
-  public function atualizar()
+  public function update()
   {
     self::initLogger();
 
     try {
-      $result = (new Database('vagas'))->update('id = ' . intval($this->id), [
-        'titulo' => $this->titulo,
-        'descricao' => $this->descricao,
-        'ativo' => $this->ativo,
-        'data' => $this->data
+      $result = (new Database('vacancies'))->update("id = '{$this->id}'", [
+        'title' => $this->title,
+        'description' => $this->description,
+        'is_active' => $this->is_active,
+        'created_at' => $this->created_at
       ]);
 
       self::$logger->info('Vacancy updated', [
         'vacancy_id' => $this->id,
-        'title' => $this->titulo
+        'title' => $this->title
       ]);
 
       return $result;
@@ -168,16 +168,16 @@ class Vaga
    * @return bool True on success
    * @throws PDOException If delete fails
    */
-  public function exluir()
+  public function delete()
   {
     self::initLogger();
 
     try {
-      $result = (new Database('vagas'))->delete('id = ' . intval($this->id));
+      $result = (new Database('vacancies'))->delete("id = '{$this->id}'");
 
       self::$logger->info('Vacancy deleted', [
         'vacancy_id' => $this->id,
-        'title' => $this->titulo
+        'title' => $this->title
       ]);
 
       return $result;
@@ -194,23 +194,23 @@ class Vaga
    * Get vacancies with optional filters and pagination
    *
    * Fetches multiple vacancies with WHERE, ORDER BY, and LIMIT clauses.
-   * Returns array of Vaga objects.
+   * Returns array of Vacancy objects.
    *
    * Example:
-   *   $vagas = Vaga::getVagas('ativo = "s"', 'data DESC', '0,10');
-   *   foreach ($vagas as $vaga) {
-   *       echo $vaga->titulo;
+   *   $vacancies = Vacancy::getVacancies('is_active = "s"', 'created_at DESC', '0,10');
+   *   foreach ($vacancies as $vacancy) {
+   *       echo $vacancy->title;
    *   }
    *
    * @param string|null $where WHERE clause without "WHERE" keyword
    * @param string|null $order ORDER BY clause without "ORDER BY" keyword
    * @param string|null $limit LIMIT clause. Format: "10" or "0,10"
-   * @return array Array of Vaga objects
+   * @return array Array of Vacancy objects
    */
-  public static function getVagas($where = null, $order = null, $limit = null)
+  public static function getVacancies($where = null, $order = null, $limit = null)
   {
     try {
-      return (new Database('vagas'))->select($where, $order, $limit)
+      return (new Database('vacancies'))->select($where, $order, $limit)
         ->fetchAll(PDO::FETCH_CLASS, self::class);
     } catch (\PDOException $e) {
       self::initLogger();
@@ -228,17 +228,17 @@ class Vaga
    * Counts vacancies with optional WHERE clause.
    *
    * Example:
-   *   $total = Vaga::getQuantidadeVagas('ativo = "s"');
+   *   $total = Vacancy::getVacancyCount('is_active = "s"');
    *   echo "Total active vacancies: " . $total;
    *
    * @param string|null $where WHERE clause without "WHERE" keyword
    * @return int Number of matching vacancies
    */
-  public static function getQuantidadeVagas($where = null)
+  public static function getVacancyCount($where = null)
   {
     try {
-      $result = (new Database('vagas'))->execute(
-        'SELECT COUNT(*) as qtd FROM vagas ' .
+      $result = (new Database('vacancies'))->execute(
+        'SELECT COUNT(*) as qtd FROM vacancies ' .
           (!is_null($where) && strlen($where) ? 'WHERE ' . $where : '')
       );
       $row = $result->fetch(PDO::FETCH_ASSOC);
@@ -259,18 +259,18 @@ class Vaga
    * Returns null if vacancy not found.
    *
    * Example:
-   *   $vaga = Vaga::getVaga(1);
-   *   if ($vaga) {
-   *       echo $vaga->titulo;
+   *   $vacancy = Vacancy::getVacancy(1);
+   *   if ($vacancy) {
+   *       echo $vacancy->title;
    *   }
    *
    * @param int $id Vacancy ID
-   * @return Vaga|null Vaga object or null if not found
+   * @return Vacancy|null Vacancy object or null if not found
    */
-  public static function getVaga($id)
+  public static function getVacancy($id)
   {
     try {
-      return (new Database('vagas'))->select('id = ' . intval($id))
+      return (new Database('vacancies'))->select("id = '{$id}'")
         ->fetchObject(self::class) ?: null;
     } catch (\PDOException $e) {
       self::initLogger();

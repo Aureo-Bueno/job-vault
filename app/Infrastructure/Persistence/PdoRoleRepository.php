@@ -16,16 +16,16 @@ class PdoRoleRepository implements RoleRepositoryInterface
     $this->db = new Database('roles');
   }
 
-  public function findById(int $id): ?Role
+  public function findById(string $id): ?Role
   {
     $result = $this->db->execute('SELECT * FROM roles WHERE id = ?', [$id]);
     $row = $result->fetch(PDO::FETCH_ASSOC);
     return $row ? $this->mapRow($row) : null;
   }
 
-  public function findByName(string $nome): ?Role
+  public function findByName(string $name): ?Role
   {
-    $result = $this->db->execute('SELECT * FROM roles WHERE nome = ? LIMIT 1', [$nome]);
+    $result = $this->db->execute('SELECT * FROM roles WHERE name = ? LIMIT 1', [$name]);
     $row = $result->fetch(PDO::FETCH_ASSOC);
     return $row ? $this->mapRow($row) : null;
   }
@@ -40,9 +40,9 @@ class PdoRoleRepository implements RoleRepositoryInterface
   private function mapRow(array $row): Role
   {
     return new Role(
-      isset($row['id']) ? (int) $row['id'] : null,
-      $row['nome'] ?? '',
-      $row['descricao'] ?? '',
+      isset($row['id']) ? (string) $row['id'] : null,
+      $row['name'] ?? '',
+      $row['description'] ?? '',
       $row['created_at'] ?? ''
     );
   }

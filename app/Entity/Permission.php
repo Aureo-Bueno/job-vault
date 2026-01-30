@@ -15,10 +15,10 @@ use App\Db\Database;
 class Permission
 {
   public $id;
-  public $nome;
-  public $descricao;
-  public $modulo;
-  public $acao;
+  public $name;
+  public $description;
+  public $module;
+  public $action;
   public $created_at;
 
   private $db;
@@ -40,7 +40,7 @@ class Permission
   public static function getPermissionById($id)
   {
     $db = new Database('permissions');
-    $result = $db->select("id = {$id}");
+    $result = $db->select("id = '{$id}'");
 
     if (is_object($result) && get_class($result) === 'PDOStatement') {
       $result = $result->fetchAll(\PDO::FETCH_OBJ);
@@ -53,10 +53,10 @@ class Permission
     $permission = new self();
     $permData = $result[0];
     $permission->id = $permData->id;
-    $permission->nome = $permData->nome;
-    $permission->descricao = $permData->descricao;
-    $permission->modulo = $permData->modulo;
-    $permission->acao = $permData->acao;
+    $permission->name = $permData->name;
+    $permission->description = $permData->description;
+    $permission->module = $permData->module;
+    $permission->action = $permData->action;
     $permission->created_at = $permData->created_at;
 
     return $permission;
@@ -65,13 +65,13 @@ class Permission
   /**
    * Get permission by name
    *
-   * @param string $nome Permission name
+   * @param string $name Permission name
    * @return Permission|null Permission object or null if not found
    */
-  public static function getPermissionByName($nome)
+  public static function getPermissionByName($name)
   {
     $db = new Database('permissions');
-    $result = $db->select("nome = '{$nome}'");
+    $result = $db->select("name = '{$name}'");
 
     if (is_object($result) && get_class($result) === 'PDOStatement') {
       $result = $result->fetchAll(\PDO::FETCH_OBJ);
@@ -84,10 +84,10 @@ class Permission
     $permission = new self();
     $permData = $result[0];
     $permission->id = $permData->id;
-    $permission->nome = $permData->nome;
-    $permission->descricao = $permData->descricao;
-    $permission->modulo = $permData->modulo;
-    $permission->acao = $permData->acao;
+    $permission->name = $permData->name;
+    $permission->description = $permData->description;
+    $permission->module = $permData->module;
+    $permission->action = $permData->action;
     $permission->created_at = $permData->created_at;
 
     return $permission;
@@ -111,10 +111,10 @@ class Permission
     foreach ($result as $permData) {
       $permission = new self();
       $permission->id = $permData->id;
-      $permission->nome = $permData->nome;
-      $permission->descricao = $permData->descricao;
-      $permission->modulo = $permData->modulo;
-      $permission->acao = $permData->acao;
+      $permission->name = $permData->name;
+      $permission->description = $permData->description;
+      $permission->module = $permData->module;
+      $permission->action = $permData->action;
       $permission->created_at = $permData->created_at;
       $permissions[] = $permission;
     }
@@ -125,13 +125,13 @@ class Permission
   /**
    * Get permissions by module
    *
-   * @param string $modulo Module name
+   * @param string $module Module name
    * @return array Array of Permission objects
    */
-  public static function getPermissionsByModule($modulo)
+  public static function getPermissionsByModule($module)
   {
     $db = new Database('permissions');
-    $result = $db->select("modulo = '{$modulo}'");
+    $result = $db->select("module = '{$module}'");
 
     if (is_object($result) && get_class($result) === 'PDOStatement') {
       $result = $result->fetchAll(\PDO::FETCH_OBJ);
@@ -141,10 +141,10 @@ class Permission
     foreach ($result as $permData) {
       $permission = new self();
       $permission->id = $permData->id;
-      $permission->nome = $permData->nome;
-      $permission->descricao = $permData->descricao;
-      $permission->modulo = $permData->modulo;
-      $permission->acao = $permData->acao;
+      $permission->name = $permData->name;
+      $permission->description = $permData->description;
+      $permission->module = $permData->module;
+      $permission->action = $permData->action;
       $permission->created_at = $permData->created_at;
       $permissions[] = $permission;
     }
@@ -160,10 +160,10 @@ class Permission
   public function create()
   {
     $this->db->insert([
-      'nome' => $this->nome,
-      'descricao' => $this->descricao,
-      'modulo' => $this->modulo,
-      'acao' => $this->acao
+      'name' => $this->name,
+      'description' => $this->description,
+      'module' => $this->module,
+      'action' => $this->action
     ]);
 
     return true;
@@ -181,11 +181,11 @@ class Permission
     }
 
     $this->db->update([
-      'nome' => $this->nome,
-      'descricao' => $this->descricao,
-      'modulo' => $this->modulo,
-      'acao' => $this->acao
-    ], "id = {$this->id}");
+      'name' => $this->name,
+      'description' => $this->description,
+      'module' => $this->module,
+      'action' => $this->action
+    ], "id = '{$this->id}'");
 
     return true;
   }
@@ -201,7 +201,7 @@ class Permission
       return false;
     }
 
-    $this->db->delete("id = {$this->id}");
+    $this->db->delete("id = '{$this->id}'");
     return true;
   }
 }

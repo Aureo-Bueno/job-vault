@@ -18,7 +18,7 @@ class PdoRolePermissionRepository implements RolePermissionRepositoryInterface
   }
 
   /** @return Permission[] */
-  public function getPermissionsByRoleId(int $roleId): array
+  public function getPermissionsByRoleId(string $roleId): array
   {
     $result = $this->db->execute(
       'SELECT p.* FROM permissions p
@@ -31,11 +31,11 @@ class PdoRolePermissionRepository implements RolePermissionRepositoryInterface
     $permissions = [];
     foreach ($rows as $row) {
       $permissions[] = new Permission(
-        isset($row['id']) ? (int) $row['id'] : null,
-        $row['nome'] ?? '',
-        $row['descricao'] ?? '',
-        $row['modulo'] ?? '',
-        $row['acao'] ?? '',
+        isset($row['id']) ? (string) $row['id'] : null,
+        $row['name'] ?? '',
+        $row['description'] ?? '',
+        $row['module'] ?? '',
+        $row['action'] ?? '',
         $row['created_at'] ?? ''
       );
     }
@@ -43,12 +43,12 @@ class PdoRolePermissionRepository implements RolePermissionRepositoryInterface
     return $permissions;
   }
 
-  public function roleHasPermission(int $roleId, string $permissionName): bool
+  public function roleHasPermission(string $roleId, string $permissionName): bool
   {
     $result = $this->db->execute(
       'SELECT 1 FROM role_permissions rp
        JOIN permissions p ON rp.permission_id = p.id
-       WHERE rp.role_id = ? AND p.nome = ?',
+       WHERE rp.role_id = ? AND p.name = ?',
       [$roleId, $permissionName]
     );
 
@@ -56,7 +56,7 @@ class PdoRolePermissionRepository implements RolePermissionRepositoryInterface
   }
 
   /** @return Role[] */
-  public function getRolesByPermissionId(int $permissionId): array
+  public function getRolesByPermissionId(string $permissionId): array
   {
     $result = $this->db->execute(
       'SELECT r.* FROM roles r
@@ -69,9 +69,9 @@ class PdoRolePermissionRepository implements RolePermissionRepositoryInterface
     $roles = [];
     foreach ($rows as $row) {
       $roles[] = new Role(
-        isset($row['id']) ? (int) $row['id'] : null,
-        $row['nome'] ?? '',
-        $row['descricao'] ?? '',
+        isset($row['id']) ? (string) $row['id'] : null,
+        $row['name'] ?? '',
+        $row['description'] ?? '',
         $row['created_at'] ?? ''
       );
     }
@@ -79,7 +79,7 @@ class PdoRolePermissionRepository implements RolePermissionRepositoryInterface
     return $roles;
   }
 
-  public function assignPermissionToRole(int $roleId, int $permissionId): bool
+  public function assignPermissionToRole(string $roleId, string $permissionId): bool
   {
     $result = $this->db->execute(
       'SELECT 1 FROM role_permissions WHERE role_id = ? AND permission_id = ?',
@@ -98,9 +98,12 @@ class PdoRolePermissionRepository implements RolePermissionRepositoryInterface
     return true;
   }
 
-  public function removePermissionFromRole(int $roleId, int $permissionId): bool
+  public function removePermissionFromRole(string $roleId, string $permissionId): bool
   {
-    $this->db->delete('role_id = ' . intval($roleId) . ' AND permission_id = ' . intval($permissionId));
+    $this->db->execute(
+      'DELETE FROM role_permissions WHERE role_id = ? AND permission_id = ?',
+      [$roleId, $permissionId]
+    );
     return true;
   }
 }

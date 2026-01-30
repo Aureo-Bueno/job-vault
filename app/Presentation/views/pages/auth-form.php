@@ -52,11 +52,11 @@
                 </div>
 
                 <div class="mb-3">
-                  <label for="senha-login" class="form-label text-white">
+                  <label for="password-login" class="form-label text-white">
                     <i class="bi bi-lock-fill"></i> Senha
                   </label>
                   <div class="input-group">
-                    <input type="password" class="form-control" id="senha-login" name="senha" placeholder="••••••••" required>
+                    <input type="password" class="form-control" id="password-login" name="password" placeholder="••••••••" required>
                     <button class="btn btn-outline-secondary" type="button" id="toggle-password-login">
                       <i class="bi bi-eye-fill"></i>
                     </button>
@@ -91,10 +91,10 @@
                 <input type="hidden" name="acao" value="cadastrar">
 
                 <div class="mb-3">
-                  <label for="nome-signup" class="form-label text-white">
+                  <label for="name-signup" class="form-label text-white">
                     <i class="bi bi-person-fill"></i> Nome Completo
                   </label>
-                  <input type="text" class="form-control" id="nome-signup" name="nome" placeholder="Seu Nome Completo" required>
+                  <input type="text" class="form-control" id="name-signup" name="name" placeholder="Seu Nome Completo" required>
                   <div class="invalid-feedback text-danger d-block">Por favor, informe seu nome.</div>
                 </div>
 
@@ -107,11 +107,11 @@
                 </div>
 
                 <div class="mb-3">
-                  <label for="senha-signup" class="form-label text-white">
+                  <label for="password-signup" class="form-label text-white">
                     <i class="bi bi-lock-fill"></i> Senha
                   </label>
                   <div class="input-group">
-                    <input type="password" class="form-control" id="senha-signup" name="senha" placeholder="••••••••" required>
+                    <input type="password" class="form-control" id="password-signup" name="password" placeholder="••••••••" required>
                     <button class="btn btn-outline-secondary" type="button" id="toggle-password-signup">
                       <i class="bi bi-eye-fill"></i>
                     </button>

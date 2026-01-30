@@ -4,46 +4,48 @@ require BASE_PATH . '/vendor/autoload.php';
 use App\Infrastructure\Container\AppContainer;
 use App\Presentation\View;
 use App\Util\RoleManager;
+use App\Util\IdValidator;
 
 $authService = AppContainer::authService();
 $authService->requireLogin();
-$usuarioLogado = $authService->getUsuarioLogado();
-$usuarioId = $usuarioLogado['id'];
+$loggedUser = $authService->getLoggedUser();
+$loggedUserId = $loggedUser['id'];
 
-RoleManager::requirePermission($usuarioId, 'usuario.editar');
+RoleManager::requirePermission($loggedUserId, 'user.edit');
 
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-  header('location: index.php?r=usuarios&status=error');
+$targetUserId = $_GET['id'] ?? null;
+if (!IdValidator::isValid($targetUserId)) {
+  header('location: index.php?r=users&status=error');
   exit;
 }
 
-$usuarioService = AppContainer::usuarioService();
+$userService = AppContainer::userService();
 $roleService = AppContainer::roleService();
 
-$usuario = $usuarioService->getById((int) $_GET['id']);
-if (!$usuario) {
-  header('location: index.php?r=usuarios&status=error');
+$user = $userService->getById((string) $targetUserId);
+if (!$user) {
+  header('location: index.php?r=users&status=error');
   exit;
 }
 
-$tituloPagina = 'Editar Usuário';
+$pageTitle = 'Editar Usuário';
 $alerta = null;
 
-$podeAtribuirRole = RoleManager::hasPermission($usuarioId, 'usuario.atribuir_role');
-$roles = $podeAtribuirRole ? $roleService->listRoles() : [];
+$canAssignRole = RoleManager::hasPermission($loggedUserId, 'user.assign_role');
+$roles = $canAssignRole ? $roleService->listRoles() : [];
 
-if (isset($_POST['nome'], $_POST['email'])) {
-  $usuario->nome = $_POST['nome'];
-  $usuario->email = $_POST['email'];
+if (isset($_POST['name'], $_POST['email'])) {
+  $user->name = $_POST['name'];
+  $user->email = $_POST['email'];
 
-  if ($podeAtribuirRole && isset($_POST['role_id']) && is_numeric($_POST['role_id'])) {
-    $usuario->roleId = (int) $_POST['role_id'];
+  if ($canAssignRole && isset($_POST['role_id']) && IdValidator::isValid($_POST['role_id'])) {
+    $user->roleId = (string) $_POST['role_id'];
   }
 
-  $senhaNova = $_POST['senha'] ?? null;
-  $ok = $usuarioService->update($usuario, $senhaNova);
+  $password = $_POST['password'] ?? null;
+  $ok = $userService->update($user, $password);
   if ($ok) {
-    header('location: index.php?r=usuarios&status=success');
+    header('location: index.php?r=users&status=success');
     exit;
   }
 
@@ -56,11 +58,11 @@ if (isset($_POST['nome'], $_POST['email'])) {
 
 View::render(VIEW_PATH . '/layout/header.php');
 View::render(VIEW_PATH . '/pages/user-form.php', [
-  'usuario' => $usuario,
+  'user' => $user,
   'roles' => $roles,
-  'podeAtribuirRole' => $podeAtribuirRole,
+  'canAssignRole' => $canAssignRole,
   'modo' => 'editar',
-  'tituloPagina' => $tituloPagina,
+  'tituloPagina' => $pageTitle,
   'alerta' => $alerta
 ]);
 View::render(VIEW_PATH . '/layout/footer.php');

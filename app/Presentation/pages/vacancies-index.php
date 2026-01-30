@@ -13,16 +13,24 @@ $authService = AppContainer::authService();
 $authService->requireLogin();
 
 // Get logged-in user info
-$usuarioLogado = $authService->getUsuarioLogado();
-$usuarioId = $usuarioLogado['id'];
+$loggedUser = $authService->getLoggedUser();
+$userId = $loggedUser['id'];
+
+// Only admin/manager can access this list
+$isAdmin = RoleManager::isAdmin($userId);
+$isManager = RoleManager::isManager($userId);
+if (!$isAdmin && !$isManager) {
+  header('Location: index.php?r=vacancies/apply');
+  exit;
+}
 
 // Check if user can view vagas
-RoleManager::requirePermission($usuarioId, 'vaga.visualizar');
+RoleManager::requirePermission($userId, 'vacancy.view');
 
 // Get search input
-$busca = filter_input(INPUT_GET, 'busca', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
-$filtroStatus = filter_input(INPUT_GET, 'filtroStatus', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
-$filtroStatus = in_array($filtroStatus, ['s', 'n']) ? $filtroStatus : '';
+$search = filter_input(INPUT_GET, 'search', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
+$statusFilter = filter_input(INPUT_GET, 'status_filter', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
+$statusFilter = in_array($statusFilter, ['s', 'n']) ? $statusFilter : '';
 
 // Alerts
 $status = filter_input(INPUT_GET, 'status', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
@@ -42,33 +50,33 @@ if ($status === 'success') {
 }
 
 // Build WHERE conditions
-$condicoes = [];
-if (!empty($busca)) {
-  $searchTerm = str_replace(' ', '%', addslashes($busca));
-  $condicoes[] = "titulo LIKE '%{$searchTerm}%'";
+$conditions = [];
+if (!empty($search)) {
+  $searchTerm = str_replace(' ', '%', addslashes($search));
+  $conditions[] = "title LIKE '%{$searchTerm}%'";
 }
-if (!empty($filtroStatus)) {
-  $condicoes[] = "ativo = '{$filtroStatus}'";
+if (!empty($statusFilter)) {
+  $conditions[] = "is_active = '{$statusFilter}'";
 }
 
-$where = !empty($condicoes) ? implode(' AND ', $condicoes) : null;
+$where = !empty($conditions) ? implode(' AND ', $conditions) : null;
 
 // Get total vacancies
-$vagaService = AppContainer::vagaService();
-$quantidadeVagas = $vagaService->count($where);
+$vacancyService = AppContainer::vacancyService();
+$totalVacancies = $vacancyService->count($where);
 
 // Pagination
-$paginaAtual = filter_input(INPUT_GET, 'pagina', FILTER_VALIDATE_INT) ?? 1;
-$obPagination = new Pagination($quantidadeVagas, $paginaAtual, 5);
-$paginacao = $obPagination->getPages();
+$currentPage = filter_input(INPUT_GET, 'pagina', FILTER_VALIDATE_INT) ?? 1;
+$pagination = new Pagination($totalVacancies, $currentPage, 5);
+$paginationPages = $pagination->getPages();
 
 // Get vacancies
-$vagas = $vagaService->list($where, 'data DESC', $obPagination->getLimit());
+$vacancies = $vacancyService->list($where, 'created_at DESC', $pagination->getLimit());
 
 // Check user permissions for template
-$podeEditar = RoleManager::hasPermission($usuarioId, 'vaga.editar');
-$podeDeletar = RoleManager::hasPermission($usuarioId, 'vaga.deletar');
-$podeCriar = RoleManager::hasPermission($usuarioId, 'vaga.criar');
+$canEdit = RoleManager::hasPermission($userId, 'vacancy.edit');
+$canDelete = RoleManager::hasPermission($userId, 'vacancy.delete');
+$canCreate = RoleManager::hasPermission($userId, 'vacancy.create');
 
 // Pagination query (preserve filters)
 $queryParams = $_GET;
@@ -79,13 +87,13 @@ $queryString = http_build_query($queryParams);
 View::render(VIEW_PATH . '/layout/header.php');
 View::render(VIEW_PATH . '/pages/vacancies-list.php', [
   'alerta' => $alerta,
-  'vagas' => $vagas,
-  'podeEditar' => $podeEditar,
-  'podeDeletar' => $podeDeletar,
-  'podeCriar' => $podeCriar,
-  'paginacao' => $paginacao,
-  'busca' => $busca,
-  'filtroStatus' => $filtroStatus,
+  'vacancies' => $vacancies,
+  'canEdit' => $canEdit,
+  'canDelete' => $canDelete,
+  'canCreate' => $canCreate,
+  'pagination' => $paginationPages,
+  'search' => $search,
+  'statusFilter' => $statusFilter,
   'queryString' => $queryString
 ]);
 View::render(VIEW_PATH . '/layout/footer.php');

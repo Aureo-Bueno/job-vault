@@ -1,5 +1,5 @@
 <?php
-// Expecting: $usuario, $roles, $podeAtribuirRole, $modo, $tituloPagina, $alerta
+// Expecting: $user, $roles, $canAssignRole, $modo, $tituloPagina, $alerta
 $tituloFormulario = $tituloPagina ?? ($modo === 'editar' ? 'Editar Usuário' : 'Cadastrar Usuário');
 $senhaObrigatoria = $modo !== 'editar';
 ?>
@@ -13,7 +13,7 @@ $senhaObrigatoria = $modo !== 'editar';
       <p class="text-muted small mb-0">Preencha os dados para salvar o usuário</p>
     </div>
     <div class="col-auto">
-      <a href="index.php?r=usuarios">
+      <a href="index.php?r=users">
         <button type="button" class="btn btn-outline-secondary">
           <i class="bi bi-arrow-left"></i> Voltar
         </button>
@@ -33,10 +33,10 @@ $senhaObrigatoria = $modo !== 'editar';
     <div class="card-body p-4">
       <form method="POST" class="needs-validation" novalidate>
         <div class="mb-4">
-          <label for="nome" class="form-label text-white fw-bold">
+          <label for="name" class="form-label text-white fw-bold">
             <i class="bi bi-person-fill"></i> Nome
           </label>
-          <input type="text" class="form-control" id="nome" name="nome" value="<?= htmlspecialchars($usuario->nome ?? '') ?>" required>
+          <input type="text" class="form-control" id="name" name="name" value="<?= htmlspecialchars($user->name ?? '') ?>" required>
           <div class="invalid-feedback text-danger">Informe o nome do usuário.</div>
         </div>
 
@@ -44,19 +44,19 @@ $senhaObrigatoria = $modo !== 'editar';
           <label for="email" class="form-label text-white fw-bold">
             <i class="bi bi-envelope-fill"></i> Email
           </label>
-          <input type="email" class="form-control" id="email" name="email" value="<?= htmlspecialchars($usuario->email ?? '') ?>" required>
+          <input type="email" class="form-control" id="email" name="email" value="<?= htmlspecialchars($user->email ?? '') ?>" required>
           <div class="invalid-feedback text-danger">Informe um email válido.</div>
         </div>
 
         <div class="mb-4">
-          <label for="senha" class="form-label text-white fw-bold">
+          <label for="password" class="form-label text-white fw-bold">
             <i class="bi bi-lock-fill"></i> Senha
           </label>
-          <input type="password" class="form-control" id="senha" name="senha" <?= $senhaObrigatoria ? 'required' : '' ?> placeholder="<?= $modo === 'editar' ? 'Deixe em branco para não alterar' : 'Defina uma senha' ?>">
+          <input type="password" class="form-control" id="password" name="password" <?= $senhaObrigatoria ? 'required' : '' ?> placeholder="<?= $modo === 'editar' ? 'Deixe em branco para não alterar' : 'Defina uma senha' ?>">
           <div class="invalid-feedback text-danger">Informe uma senha válida.</div>
         </div>
 
-        <?php if ($podeAtribuirRole) : ?>
+        <?php if ($canAssignRole) : ?>
           <div class="mb-4">
             <label for="role_id" class="form-label text-white fw-bold">
               <i class="bi bi-shield-fill"></i> Role
@@ -64,8 +64,9 @@ $senhaObrigatoria = $modo !== 'editar';
             <select name="role_id" id="role_id" class="form-select">
               <option value="">Sem role</option>
               <?php foreach ($roles as $role) : ?>
-                <option value="<?= (int) $role->id ?>" <?= (int) ($usuario->roleId ?? 0) === (int) $role->id ? 'selected' : '' ?>>
-                  <?= htmlspecialchars($role->nome) ?>
+                <?php $roleIdValue = (string) ($role->id ?? ''); ?>
+                <option value="<?= htmlspecialchars($roleIdValue) ?>" <?= ($user->roleId ?? '') === $roleIdValue ? 'selected' : '' ?>>
+                  <?= htmlspecialchars($role->name) ?>
                 </option>
               <?php endforeach; ?>
             </select>
@@ -76,7 +77,7 @@ $senhaObrigatoria = $modo !== 'editar';
           <button type="submit" class="btn btn-primary btn-lg fw-bold flex-grow-1">
             <i class="bi bi-check-lg"></i> Salvar
           </button>
-          <a href="index.php?r=usuarios" class="btn btn-outline-secondary btn-lg fw-bold">
+          <a href="index.php?r=users" class="btn btn-outline-secondary btn-lg fw-bold">
             <i class="bi bi-x-lg"></i> Cancelar
           </a>
         </div>

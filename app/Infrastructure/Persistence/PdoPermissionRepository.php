@@ -16,16 +16,16 @@ class PdoPermissionRepository implements PermissionRepositoryInterface
     $this->db = new Database('permissions');
   }
 
-  public function findById(int $id): ?Permission
+  public function findById(string $id): ?Permission
   {
     $result = $this->db->execute('SELECT * FROM permissions WHERE id = ?', [$id]);
     $row = $result->fetch(PDO::FETCH_ASSOC);
     return $row ? $this->mapRow($row) : null;
   }
 
-  public function findByName(string $nome): ?Permission
+  public function findByName(string $name): ?Permission
   {
-    $result = $this->db->execute('SELECT * FROM permissions WHERE nome = ? LIMIT 1', [$nome]);
+    $result = $this->db->execute('SELECT * FROM permissions WHERE name = ? LIMIT 1', [$name]);
     $row = $result->fetch(PDO::FETCH_ASSOC);
     return $row ? $this->mapRow($row) : null;
   }
@@ -38,9 +38,9 @@ class PdoPermissionRepository implements PermissionRepositoryInterface
   }
 
   /** @return Permission[] */
-  public function findByModule(string $modulo): array
+  public function findByModule(string $module): array
   {
-    $result = $this->db->execute('SELECT * FROM permissions WHERE modulo = ?', [$modulo]);
+    $result = $this->db->execute('SELECT * FROM permissions WHERE module = ?', [$module]);
     $rows = $result->fetchAll(PDO::FETCH_ASSOC);
     return array_map([$this, 'mapRow'], $rows);
   }
@@ -48,11 +48,11 @@ class PdoPermissionRepository implements PermissionRepositoryInterface
   private function mapRow(array $row): Permission
   {
     return new Permission(
-      isset($row['id']) ? (int) $row['id'] : null,
-      $row['nome'] ?? '',
-      $row['descricao'] ?? '',
-      $row['modulo'] ?? '',
-      $row['acao'] ?? '',
+      isset($row['id']) ? (string) $row['id'] : null,
+      $row['name'] ?? '',
+      $row['description'] ?? '',
+      $row['module'] ?? '',
+      $row['action'] ?? '',
       $row['created_at'] ?? ''
     );
   }

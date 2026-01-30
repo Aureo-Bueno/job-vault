@@ -34,7 +34,7 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
       - ./setup.sql:/docker-entrypoint-initdb.d/setup.sql
-    command: --default-authentication-plugin=mysql_native_password
+    # Use MySQL 8 default auth (caching_sha2_password) to avoid deprecation warning
     networks:
       - app_network
     healthcheck:

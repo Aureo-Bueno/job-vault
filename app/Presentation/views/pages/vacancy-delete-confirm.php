@@ -3,7 +3,7 @@
 
   <form method="POST">
     <div class="form-group">
-      <p>Você deseja realmente excluir a Vaga <strong><?= htmlspecialchars($obVaga->titulo ?? '') ?></strong>?</p>
+      <p>Você deseja realmente excluir a Vaga <strong><?= htmlspecialchars($vacancy->title ?? '') ?></strong>?</p>
     </div>
 
 

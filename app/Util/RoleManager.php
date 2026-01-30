@@ -25,7 +25,7 @@ class RoleManager
    */
   public static function hasPermission($userId, $permissionName)
   {
-    return self::service()->hasPermission((int) $userId, $permissionName);
+    return self::service()->hasPermission((string) $userId, $permissionName);
   }
 
   /**
@@ -33,7 +33,7 @@ class RoleManager
    */
   public static function getPermissionsByRole($roleId)
   {
-    return self::service()->getPermissionsByRole((int) $roleId);
+    return self::service()->getPermissionsByRole((string) $roleId);
   }
 
   /**
@@ -41,7 +41,7 @@ class RoleManager
    */
   public static function getUserRole($userId)
   {
-    return self::service()->getUserRole((int) $userId);
+    return self::service()->getUserRole((string) $userId);
   }
 
   /**
@@ -49,15 +49,15 @@ class RoleManager
    */
   public static function isAdmin($userId)
   {
-    return self::service()->isAdmin((int) $userId);
+    return self::service()->isAdmin((string) $userId);
   }
 
   /**
-   * Check if user is gestor
+   * Check if user is manager (gestor role)
    */
-  public static function isGestor($userId)
+  public static function isManager($userId)
   {
-    return self::service()->isGestor((int) $userId);
+    return self::service()->isManager((string) $userId);
   }
 
   /**
@@ -65,6 +65,6 @@ class RoleManager
    */
   public static function requirePermission($userId, $permissionName)
   {
-    self::service()->requirePermission((int) $userId, $permissionName);
+    self::service()->requirePermission((string) $userId, $permissionName);
   }
 }

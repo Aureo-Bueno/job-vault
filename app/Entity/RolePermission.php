@@ -82,10 +82,10 @@ class RolePermission
     foreach ($result as $permData) {
       $perm = new Permission();
       $perm->id = $permData->id;
-      $perm->nome = $permData->nome;
-      $perm->descricao = $permData->descricao;
-      $perm->modulo = $permData->modulo;
-      $perm->acao = $permData->acao;
+      $perm->name = $permData->name;
+      $perm->description = $permData->description;
+      $perm->module = $permData->module;
+      $perm->action = $permData->action;
       $permissions[] = $perm;
     }
 
@@ -105,7 +105,7 @@ class RolePermission
     $result = $db->execute(
       "SELECT 1 FROM role_permissions rp
        JOIN permissions p ON rp.permission_id = p.id
-       WHERE rp.role_id = ? AND p.nome = ?",
+       WHERE rp.role_id = ? AND p.name = ?",
       [$roleId, $permissionName]
     );
 
@@ -140,8 +140,8 @@ class RolePermission
     foreach ($result as $roleData) {
       $role = new Role();
       $role->id = $roleData->id;
-      $role->nome = $roleData->nome;
-      $role->descricao = $roleData->descricao;
+      $role->name = $roleData->name;
+      $role->description = $roleData->description;
       $roles[] = $role;
     }
 
@@ -191,7 +191,7 @@ class RolePermission
   public static function removePermissionFromRole($roleId, $permissionId)
   {
     $db = new Database('role_permissions');
-    $db->delete("role_id = {$roleId} AND permission_id = {$permissionId}");
+    $db->delete("role_id = '{$roleId}' AND permission_id = '{$permissionId}'");
     return true;
   }
 
@@ -216,7 +216,7 @@ class RolePermission
       return false;
     }
 
-    $this->db->delete("id = {$this->id}");
+    $this->db->delete("id = '{$this->id}'");
     return true;
   }
 }

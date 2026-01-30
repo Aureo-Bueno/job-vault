@@ -1,5 +1,5 @@
 <?php
-// Expecting: $alerta, $vagas, $podeEditar, $podeDeletar, $podeCriar, $paginacao, $busca, $filtroStatus, $queryString
+// Expecting: $alerta, $vacancies, $canEdit, $canDelete, $canCreate, $pagination, $search, $statusFilter, $queryString
 ?>
 
 <div class="container-content p-5">
@@ -20,9 +20,9 @@
       </h2>
       <p class="text-muted small mb-0">Gerencie as vagas do seu sistema</p>
     </div>
-    <?php if ($podeCriar) : ?>
+    <?php if ($canCreate) : ?>
       <div class="col-auto">
-        <a href="index.php?r=vagas/novo">
+        <a href="index.php?r=vacancies/new">
           <button class="btn btn-primary fw-bold">
             <i class="bi bi-plus-circle-fill"></i> Nova Vaga
           </button>
@@ -36,20 +36,20 @@
     <div class="card-body">
       <form method="GET" class="row g-3">
         <div class="col-md-5">
-          <label for="busca" class="form-label text-white">
+          <label for="search" class="form-label text-white">
             <i class="bi bi-search"></i> Buscar por Título
           </label>
-          <input type="text" name="busca" id="busca" class="form-control" placeholder="Digite o título..." value="<?= htmlspecialchars($busca) ?>">
+          <input type="text" name="search" id="search" class="form-control" placeholder="Digite o título..." value="<?= htmlspecialchars($search) ?>">
         </div>
 
         <div class="col-md-4">
-          <label for="filtroStatus" class="form-label text-white">
+          <label for="status_filter" class="form-label text-white">
             <i class="bi bi-funnel-fill"></i> Status
           </label>
-          <select name="filtroStatus" id="filtroStatus" class="form-select">
+          <select name="status_filter" id="status_filter" class="form-select">
             <option value="">Todos</option>
-            <option value="s" <?= $filtroStatus == 's' ? 'selected' : '' ?>>Ativo</option>
-            <option value="n" <?= $filtroStatus == 'n' ? 'selected' : '' ?>>Inativo</option>
+            <option value="s" <?= $statusFilter == 's' ? 'selected' : '' ?>>Ativo</option>
+            <option value="n" <?= $statusFilter == 'n' ? 'selected' : '' ?>>Inativo</option>
           </select>
         </div>
 
@@ -77,45 +77,46 @@
           </tr>
         </thead>
         <tbody>
-          <?php if (empty($vagas)) : ?>
+          <?php if (empty($vacancies)) : ?>
             <tr>
               <td colspan="6" class="text-center text-muted py-4">
                 <i class="bi bi-inbox"></i> Nenhuma vaga encontrada no sistema!
               </td>
             </tr>
           <?php else : ?>
-            <?php foreach ($vagas as $vaga) : ?>
+            <?php foreach ($vacancies as $index => $vacancy) : ?>
               <?php
-              $statusAtivo = ($vaga->ativo ?? 'n') === 's';
+              $statusAtivo = ($vacancy->isActive ?? 'n') === 's';
               $badgeClass = $statusAtivo ? 'bg-success' : 'bg-secondary';
               $statusText = $statusAtivo ? 'Ativo' : 'Inativo';
-              $descricaoCurta = substr($vaga->descricao ?? '', 0, 50);
-              $dataFormatada = !empty($vaga->data) ? date('d/m/Y H:i', strtotime($vaga->data)) : '-';
+              $descricaoCurta = substr($vacancy->description ?? '', 0, 50);
+              $dataFormatada = !empty($vacancy->createdAt) ? date('d/m/Y H:i', strtotime($vacancy->createdAt)) : '-';
+              $vacancyId = (string) ($vacancy->id ?? '');
               ?>
               <tr class="align-middle">
-                <td><strong>#<?= (int) $vaga->id ?></strong></td>
-                <td><strong><?= htmlspecialchars($vaga->titulo ?? '') ?></strong></td>
+                <td><strong>#<?= $index + 1 ?></strong></td>
+                <td><strong><?= htmlspecialchars($vacancy->title ?? '') ?></strong></td>
                 <td class="text-muted small"><?= htmlspecialchars($descricaoCurta) ?>...</td>
                 <td><span class="badge <?= $badgeClass ?>"><?= $statusText ?></span></td>
                 <td class="small"><?= $dataFormatada ?></td>
                 <td>
-                  <?php if ($podeEditar) : ?>
-                    <a href="index.php?r=vagas/editar&id=<?= (int) $vaga->id ?>" class="me-2">
+                  <?php if ($canEdit) : ?>
+                    <a href="index.php?r=vacancies/edit&id=<?= htmlspecialchars($vacancyId) ?>" class="me-2">
                       <button type="button" class="btn btn-primary btn-sm">
                         <i class="bi bi-pencil-fill"></i> Editar
                       </button>
                     </a>
                   <?php endif; ?>
 
-                  <?php if ($podeDeletar) : ?>
-                    <a href="index.php?r=vagas/excluir&id=<?= (int) $vaga->id ?>">
+                  <?php if ($canDelete) : ?>
+                    <a href="index.php?r=vacancies/delete&id=<?= htmlspecialchars($vacancyId) ?>">
                       <button type="button" class="btn btn-danger btn-sm">
                         <i class="bi bi-trash-fill"></i> Excluir
                       </button>
                     </a>
                   <?php endif; ?>
 
-                  <?php if (!$podeEditar && !$podeDeletar) : ?>
+                  <?php if (!$canEdit && !$canDelete) : ?>
                     <span class="badge bg-secondary">Sem permissões</span>
                   <?php endif; ?>
                 </td>
@@ -128,12 +129,12 @@
   </div>
 
   <!-- Pagination Section -->
-  <?php if (!empty($paginacao)) : ?>
+  <?php if (!empty($pagination)) : ?>
     <div class="d-flex justify-content-center mt-4">
       <nav>
-        <?php foreach ($paginacao as $pagina) : ?>
+        <?php foreach ($pagination as $pagina) : ?>
           <?php $class = $pagina['atual'] ? 'btn-primary' : 'btn-outline-secondary'; ?>
-          <a href="index.php?r=home&pagina=<?= $pagina['pagina'] ?><?= $queryString ? '&' . $queryString : '' ?>">
+          <a href="index.php?r=vacancies&pagina=<?= $pagina['pagina'] ?><?= $queryString ? '&' . $queryString : '' ?>">
             <button type="button" class="btn <?= $class ?> me-2"><?= $pagina['pagina'] ?></button>
           </a>
         <?php endforeach; ?>

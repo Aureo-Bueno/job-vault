@@ -5,57 +5,57 @@ namespace App\Application\Service;
 use App\Domain\Model\Role;
 use App\Domain\Repository\RolePermissionRepositoryInterface;
 use App\Domain\Repository\RoleRepositoryInterface;
-use App\Domain\Repository\UsuarioRepositoryInterface;
+use App\Domain\Repository\UserRepositoryInterface;
 
 class RoleService
 {
-  private UsuarioRepositoryInterface $usuarioRepository;
+  private UserRepositoryInterface $userRepository;
   private RoleRepositoryInterface $roleRepository;
   private RolePermissionRepositoryInterface $rolePermissionRepository;
 
   public function __construct(
-    UsuarioRepositoryInterface $usuarioRepository,
+    UserRepositoryInterface $userRepository,
     RoleRepositoryInterface $roleRepository,
     RolePermissionRepositoryInterface $rolePermissionRepository
   ) {
-    $this->usuarioRepository = $usuarioRepository;
+    $this->userRepository = $userRepository;
     $this->roleRepository = $roleRepository;
     $this->rolePermissionRepository = $rolePermissionRepository;
   }
 
-  public function hasPermission(int $userId, string $permissionName): bool
+  public function hasPermission(string $userId, string $permissionName): bool
   {
-    $usuario = $this->usuarioRepository->findById($userId);
+    $user = $this->userRepository->findById($userId);
 
-    if (!$usuario || $usuario->roleId === null) {
+    if (!$user || $user->roleId === null) {
       return false;
     }
 
-    return $this->rolePermissionRepository->roleHasPermission($usuario->roleId, $permissionName);
+    return $this->rolePermissionRepository->roleHasPermission($user->roleId, $permissionName);
   }
 
   /** @return string[] */
-  public function getPermissionsByRole(int $roleId): array
+  public function getPermissionsByRole(string $roleId): array
   {
     $permissions = $this->rolePermissionRepository->getPermissionsByRoleId($roleId);
 
     $permissionNames = [];
     foreach ($permissions as $permission) {
-      $permissionNames[] = $permission->nome;
+      $permissionNames[] = $permission->name;
     }
 
     return $permissionNames;
   }
 
-  public function getUserRole(int $userId): ?Role
+  public function getUserRole(string $userId): ?Role
   {
-    $usuario = $this->usuarioRepository->findById($userId);
+    $user = $this->userRepository->findById($userId);
 
-    if (!$usuario || $usuario->roleId === null) {
+    if (!$user || $user->roleId === null) {
       return null;
     }
 
-    return $this->roleRepository->findById($usuario->roleId);
+    return $this->roleRepository->findById($user->roleId);
   }
 
   /** @return Role[] */
@@ -64,19 +64,19 @@ class RoleService
     return $this->roleRepository->findAll();
   }
 
-  public function isAdmin(int $userId): bool
+  public function isAdmin(string $userId): bool
   {
     $role = $this->getUserRole($userId);
-    return $role && $role->nome === 'admin';
+    return $role && $role->name === 'admin';
   }
 
-  public function isGestor(int $userId): bool
+  public function isManager(string $userId): bool
   {
     $role = $this->getUserRole($userId);
-    return $role && $role->nome === 'gestor';
+    return $role && $role->name === 'gestor';
   }
 
-  public function requirePermission(int $userId, string $permissionName): void
+  public function requirePermission(string $userId, string $permissionName): void
   {
     if (!$this->hasPermission($userId, $permissionName)) {
       http_response_code(403);

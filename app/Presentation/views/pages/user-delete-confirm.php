@@ -1,5 +1,5 @@
 <?php
-// Expecting: $usuario
+// Expecting: $user
 ?>
 
 <main class="container-content p-5">
@@ -9,10 +9,10 @@
     <div class="card">
       <div class="card-body">
         <p class="text-muted">
-          Você deseja realmente excluir o usuário <strong><?= htmlspecialchars($usuario->nome ?? '') ?></strong>?
+          Você deseja realmente excluir o usuário <strong><?= htmlspecialchars($user->name ?? '') ?></strong>?
         </p>
         <div class="d-flex gap-3">
-          <a href="index.php?r=usuarios" class="btn btn-outline-secondary">
+          <a href="index.php?r=users" class="btn btn-outline-secondary">
             Cancelar
           </a>
           <button type="submit" name="excluir" class="btn btn-danger">Excluir</button>

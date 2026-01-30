@@ -4,29 +4,31 @@ require BASE_PATH . '/vendor/autoload.php';
 use \App\Util\RoleManager;
 use App\Infrastructure\Container\AppContainer;
 use App\Presentation\View;
+use App\Util\IdValidator;
 
 // Require login
 $authService = AppContainer::authService();
 $authService->requireLogin();
-$usuarioId = $authService->getUsuarioLogado()['id'];
+$userId = $authService->getLoggedUser()['id'];
 
 // Check permission to create/edit
-RoleManager::requirePermission($usuarioId, 'vaga.editar');
+RoleManager::requirePermission($userId, 'vacancy.edit');
 
-$tituloPagina = 'Editar vaga';
+$pageTitle = 'Editar vaga';
 
 //VALIDA O ID
-if (!isset($_GET['id']) or !is_numeric($_GET['id'])) {
+$vacancyId = $_GET['id'] ?? null;
+if (!IdValidator::isValid($vacancyId)) {
   header('location: index.php?r=home&status=error');
   exit;
 }
 
 //CONSULTA A VAGA
-$vagaService = AppContainer::vagaService();
-$obVaga = $vagaService->getById((int) $_GET['id']);
+$vacancyService = AppContainer::vacancyService();
+$vacancy = $vacancyService->getById((string) $vacancyId);
 
 // VALIDAR A VAGA
-if (!$obVaga) {
+if (!$vacancy) {
   header('location: index.php?r=home&status=error');
   exit;
 }
@@ -35,12 +37,12 @@ if (!$obVaga) {
 
 
 //VALIDAÇAO DO POST
-if (isset($_POST['titulo'], $_POST['descricao'], $_POST['ativo'])) {
+if (isset($_POST['title'], $_POST['description'], $_POST['is_active'])) {
 
-  $obVaga->titulo = $_POST['titulo'];
-  $obVaga->descricao = $_POST['descricao'];
-  $obVaga->ativo = $_POST['ativo'];
-  $vagaService->update($obVaga);
+  $vacancy->title = $_POST['title'];
+  $vacancy->description = $_POST['description'];
+  $vacancy->isActive = $_POST['is_active'];
+  $vacancyService->update($vacancy);
 
 
   header('location: index.php?r=home&status=success');
@@ -49,7 +51,7 @@ if (isset($_POST['titulo'], $_POST['descricao'], $_POST['ativo'])) {
 
 View::render(VIEW_PATH . '/layout/header.php');
 View::render(VIEW_PATH . '/pages/vacancy-form.php', [
-  'obVaga' => $obVaga,
-  'tituloPagina' => $tituloPagina
+  'vacancy' => $vacancy,
+  'tituloPagina' => $pageTitle
 ]);
 View::render(VIEW_PATH . '/layout/footer.php');

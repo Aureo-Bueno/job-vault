@@ -2,81 +2,81 @@
 
 namespace App\Application\Service;
 
-use App\Domain\Model\Usuario;
-use App\Domain\Repository\UsuarioRepositoryInterface;
+use App\Domain\Model\User;
+use App\Domain\Repository\UserRepositoryInterface;
 use App\Util\Logger;
 
 class AuthService
 {
-  private UsuarioRepositoryInterface $usuarioRepository;
+  private UserRepositoryInterface $userRepository;
   private Logger $logger;
 
-  public function __construct(UsuarioRepositoryInterface $usuarioRepository)
+  public function __construct(UserRepositoryInterface $userRepository)
   {
-    $this->usuarioRepository = $usuarioRepository;
+    $this->userRepository = $userRepository;
     $this->logger = new Logger('login');
   }
 
-  public function authenticate(string $email, string $senha): ?Usuario
+  public function authenticate(string $email, string $password): ?User
   {
-    $usuario = $this->usuarioRepository->findByEmail($email);
+    $user = $this->userRepository->findByEmail($email);
 
-    if (!$usuario) {
+    if (!$user) {
       return null;
     }
 
-    return password_verify($senha, $usuario->senha) ? $usuario : null;
+    return password_verify($password, $user->password) ? $user : null;
   }
 
-  /** @return array{user:?Usuario,error:?string} */
-  public function register(string $nome, string $email, string $senha): array
+  /** @return array{user:?User,error:?string} */
+  public function register(string $name, string $email, string $password): array
   {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
       return ['user' => null, 'error' => 'Email inválido'];
     }
 
-    if (strlen($senha) < 6) {
+    if (strlen($password) < 6) {
       return ['user' => null, 'error' => 'A senha deve ter no mínimo 6 caracteres'];
     }
 
-    $existing = $this->usuarioRepository->findByEmail($email);
+    $existing = $this->userRepository->findByEmail($email);
     if ($existing) {
       return ['user' => null, 'error' => 'O Email digitado já está em uso'];
     }
 
-    $usuario = new Usuario(
+    $user = new User(
       null,
-      $nome,
+      $name,
       $email,
-      password_hash($senha, PASSWORD_DEFAULT),
+      password_hash($password, PASSWORD_DEFAULT),
       null
     );
 
-    $id = $this->usuarioRepository->create($usuario);
+    $id = $this->userRepository->create($user);
     if (!$id) {
       return ['user' => null, 'error' => 'Não foi possível criar o usuário'];
     }
 
-    $usuario->id = $id;
-    return ['user' => $usuario, 'error' => null];
+    $user->id = $id;
+    return ['user' => $user, 'error' => null];
   }
 
-  public function login(Usuario $usuario): void
+  public function login(User $user): void
   {
     $this->initSession();
 
-    $roleId = $usuario->roleId ?? ($usuario->role_id ?? null);
+    $roleId = $user->roleId ?? ($user->role_id ?? null);
 
-    $_SESSION['usuario'] = [
-      'id' => $usuario->id,
-      'nome' => $usuario->nome,
-      'email' => $usuario->email,
+    $_SESSION['user'] = [
+      'id' => $user->id,
+      'name' => $user->name,
+      'email' => $user->email,
       'role_id' => $roleId
     ];
 
     $logger = $this->logger;
-    $userId = $usuario->id;
-    $email = $usuario->email;
+    $userId = $user->id;
+    $email = $user->email;
     register_shutdown_function(function () use ($logger, $userId, $email, $roleId) {
       $logger->info('User logged in', [
         'user_id' => $userId,
@@ -94,8 +94,8 @@ class AuthService
   {
     $this->initSession();
 
-    $userEmail = $_SESSION['usuario']['email'] ?? 'unknown';
-    unset($_SESSION['usuario']);
+    $userEmail = $_SESSION['user']['email'] ?? 'unknown';
+    unset($_SESSION['user']);
 
     $logger = $this->logger;
     register_shutdown_function(function () use ($logger, $userEmail) {
@@ -109,16 +109,16 @@ class AuthService
     exit;
   }
 
-  public function getUsuarioLogado(): ?array
+  public function getLoggedUser(): ?array
   {
     $this->initSession();
-    return $this->isLogged() ? $_SESSION['usuario'] : null;
+    return $this->isLogged() ? $_SESSION['user'] : null;
   }
 
   public function isLogged(): bool
   {
     $this->initSession();
-    return isset($_SESSION['usuario']['id']);
+    return isset($_SESSION['user']['id']);
   }
 
   public function requireLogin(): void

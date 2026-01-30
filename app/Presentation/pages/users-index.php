@@ -8,23 +8,23 @@ use App\Util\RoleManager;
 
 $authService = AppContainer::authService();
 $authService->requireLogin();
-$usuarioLogado = $authService->getUsuarioLogado();
-$usuarioId = $usuarioLogado['id'];
+$loggedUser = $authService->getLoggedUser();
+$userId = $loggedUser['id'];
 
-RoleManager::requirePermission($usuarioId, 'usuario.listar');
+RoleManager::requirePermission($userId, 'user.list');
 
-$usuarioService = AppContainer::usuarioService();
+$userService = AppContainer::userService();
 $roleService = AppContainer::roleService();
 
-$busca = filter_input(INPUT_GET, 'busca', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
+$search = filter_input(INPUT_GET, 'search', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
 
-$condicoes = [];
-if (!empty($busca)) {
-  $searchTerm = str_replace(' ', '%', addslashes($busca));
-  $condicoes[] = "(nome LIKE '%{$searchTerm}%' OR email LIKE '%{$searchTerm}%')";
+$conditions = [];
+if (!empty($search)) {
+  $searchTerm = str_replace(' ', '%', addslashes($search));
+  $conditions[] = "(name LIKE '%{$searchTerm}%' OR email LIKE '%{$searchTerm}%')";
 }
 
-$where = !empty($condicoes) ? implode(' AND ', $condicoes) : null;
+$where = !empty($conditions) ? implode(' AND ', $conditions) : null;
 
 $status = filter_input(INPUT_GET, 'status', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
 $alerta = null;
@@ -42,22 +42,22 @@ if ($status === 'success') {
   ];
 }
 
-$totalUsuarios = $usuarioService->count($where);
-$paginaAtual = filter_input(INPUT_GET, 'pagina', FILTER_VALIDATE_INT) ?? 1;
-$obPagination = new Pagination($totalUsuarios, $paginaAtual, 8);
-$paginacao = $obPagination->getPages();
+$totalUsers = $userService->count($where);
+$currentPage = filter_input(INPUT_GET, 'pagina', FILTER_VALIDATE_INT) ?? 1;
+$pagination = new Pagination($totalUsers, $currentPage, 8);
+$paginationPages = $pagination->getPages();
 
-$usuarios = $usuarioService->list($where, 'id DESC', $obPagination->getLimit());
+$users = $userService->list($where, 'id DESC', $pagination->getLimit());
 
 $roles = $roleService->listRoles();
 $rolesById = [];
 foreach ($roles as $role) {
-  $rolesById[$role->id] = $role->nome;
+  $rolesById[$role->id] = $role->name;
 }
 
-$podeEditar = RoleManager::hasPermission($usuarioId, 'usuario.editar');
-$podeDeletar = RoleManager::hasPermission($usuarioId, 'usuario.deletar');
-$podeCriar = $podeEditar;
+$canEdit = RoleManager::hasPermission($userId, 'user.edit');
+$canDelete = RoleManager::hasPermission($userId, 'user.delete');
+$canCreate = $canEdit;
 
 $queryParams = $_GET;
 unset($queryParams['status'], $queryParams['pagina'], $queryParams['r']);
@@ -66,13 +66,13 @@ $queryString = http_build_query($queryParams);
 View::render(VIEW_PATH . '/layout/header.php');
 View::render(VIEW_PATH . '/pages/users-list.php', [
   'alerta' => $alerta,
-  'usuarios' => $usuarios,
+  'users' => $users,
   'rolesById' => $rolesById,
-  'podeEditar' => $podeEditar,
-  'podeDeletar' => $podeDeletar,
-  'podeCriar' => $podeCriar,
-  'paginacao' => $paginacao,
-  'busca' => $busca,
+  'canEdit' => $canEdit,
+  'canDelete' => $canDelete,
+  'canCreate' => $canCreate,
+  'pagination' => $paginationPages,
+  'search' => $search,
   'queryString' => $queryString
 ]);
 View::render(VIEW_PATH . '/layout/footer.php');

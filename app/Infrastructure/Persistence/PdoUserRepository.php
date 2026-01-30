@@ -3,26 +3,27 @@
 namespace App\Infrastructure\Persistence;
 
 use App\Db\Database;
-use App\Domain\Model\Usuario;
-use App\Domain\Repository\UsuarioRepositoryInterface;
+use App\Domain\Model\User;
+use App\Domain\Repository\UserRepositoryInterface;
 use App\Util\Logger;
+use App\Util\Uuid;
 use PDO;
 
-class PdoUsuarioRepository implements UsuarioRepositoryInterface
+class PdoUserRepository implements UserRepositoryInterface
 {
   private Database $db;
   private Logger $logger;
 
   public function __construct()
   {
-    $this->db = new Database('usuarios');
-    $this->logger = new Logger('usuario');
+    $this->db = new Database('users');
+    $this->logger = new Logger('user');
   }
 
-  public function findByEmail(string $email): ?Usuario
+  public function findByEmail(string $email): ?User
   {
     try {
-      $result = $this->db->execute('SELECT * FROM usuarios WHERE email = ?', [$email]);
+      $result = $this->db->execute('SELECT * FROM users WHERE email = ?', [$email]);
       $row = $result->fetch(PDO::FETCH_ASSOC);
       return $row ? $this->mapRow($row) : null;
     } catch (\Exception $e) {
@@ -34,10 +35,10 @@ class PdoUsuarioRepository implements UsuarioRepositoryInterface
     }
   }
 
-  public function findById(int $id): ?Usuario
+  public function findById(string $id): ?User
   {
     try {
-      $result = $this->db->execute('SELECT * FROM usuarios WHERE id = ?', [$id]);
+      $result = $this->db->execute('SELECT * FROM users WHERE id = ?', [$id]);
       $row = $result->fetch(PDO::FETCH_ASSOC);
       return $row ? $this->mapRow($row) : null;
     } catch (\Exception $e) {
@@ -49,7 +50,7 @@ class PdoUsuarioRepository implements UsuarioRepositoryInterface
     }
   }
 
-  /** @return Usuario[] */
+  /** @return User[] */
   public function findAll(?string $where = null, ?string $order = null, ?string $limit = null): array
   {
     try {
@@ -76,59 +77,66 @@ class PdoUsuarioRepository implements UsuarioRepositoryInterface
     }
   }
 
-  public function create(Usuario $usuario): ?int
+  public function create(User $user): ?string
   {
     try {
-      if ($usuario->roleId === null) {
-        $usuario->roleId = $this->getDefaultRoleId();
+      if ($user->roleId === null) {
+        $user->roleId = $this->getDefaultRoleId();
       }
 
-      $id = $this->db->insert([
-        'nome' => $usuario->nome,
-        'email' => $usuario->email,
-        'senha' => $usuario->senha,
-        'role_id' => $usuario->roleId
+      if ($user->id === null) {
+        $user->id = Uuid::v4();
+      }
+
+      $this->db->insert([
+        'id' => $user->id,
+        'name' => $user->name,
+        'email' => $user->email,
+        'password' => $user->password,
+        'role_id' => $user->roleId
       ]);
 
-      $usuario->id = (int) $id;
-      return $usuario->id;
+      return $user->id;
     } catch (\Exception $e) {
       $this->logger->error('Failed to create user', [
         'error' => $e->getMessage(),
-        'email' => $usuario->email
+        'email' => $user->email
       ]);
       return null;
     }
   }
 
-  public function update(Usuario $usuario): bool
+  public function update(User $user): bool
   {
     try {
       $values = [
-        'nome' => $usuario->nome,
-        'email' => $usuario->email,
-        'role_id' => $usuario->roleId
+        'name' => $user->name,
+        'email' => $user->email,
+        'role_id' => $user->roleId
       ];
 
-      if (!empty($usuario->senha)) {
-        $values['senha'] = $usuario->senha;
+      if (!empty($user->password)) {
+        $values['password'] = $user->password;
       }
 
-      $this->db->update('id = ' . intval($usuario->id), $values);
+      $setClause = implode(' = ?, ', array_keys($values)) . ' = ?';
+      $params = array_values($values);
+      $params[] = $user->id;
+      $this->db->execute('UPDATE users SET ' . $setClause . ' WHERE id = ?', $params);
       return true;
     } catch (\Exception $e) {
       $this->logger->error('Failed to update user', [
         'error' => $e->getMessage(),
-        'user_id' => $usuario->id
+        'user_id' => $user->id
       ]);
       return false;
     }
   }
 
-  public function delete(int $id): bool
+  public function delete(string $id): bool
   {
     try {
-      $this->db->delete('id = ' . intval($id));
+      $this->db->execute('DELETE FROM users WHERE id = ?', [$id]);
       return true;
     } catch (\Exception $e) {
       $this->logger->error('Failed to delete user', [
@@ -139,13 +147,13 @@ class PdoUsuarioRepository implements UsuarioRepositoryInterface
     }
   }
 
-  public function getDefaultRoleId(): ?int
+  public function getDefaultRoleId(): ?string
   {
     try {
       $dbRoles = new Database('roles');
-      $result = $dbRoles->execute("SELECT id FROM roles WHERE nome = 'usuario' LIMIT 1");
+      $result = $dbRoles->execute("SELECT id FROM roles WHERE name = 'usuario' LIMIT 1");
       $row = $result->fetch(PDO::FETCH_ASSOC);
-      return $row ? (int) $row['id'] : null;
+      return $row ? (string) $row['id'] : null;
     } catch (\Exception $e) {
       $this->logger->error('Failed to get default role', [
         'error' => $e->getMessage()
@@ -154,14 +162,14 @@ class PdoUsuarioRepository implements UsuarioRepositoryInterface
     }
   }
 
-  private function mapRow(array $row): Usuario
+  private function mapRow(array $row): User
   {
-    return new Usuario(
-      isset($row['id']) ? (int) $row['id'] : null,
-      $row['nome'] ?? '',
+    return new User(
+      isset($row['id']) ? (string) $row['id'] : null,
+      $row['name'] ?? '',
       $row['email'] ?? '',
-      $row['senha'] ?? '',
-      isset($row['role_id']) ? (int) $row['role_id'] : null
+      $row['password'] ?? '',
+      isset($row['role_id']) ? (string) $row['role_id'] : null
     );
   }
 }

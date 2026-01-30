@@ -15,8 +15,8 @@ use App\Db\Database;
 class Role
 {
   public $id;
-  public $nome;
-  public $descricao;
+  public $name;
+  public $description;
   public $created_at;
 
   private $db;
@@ -38,7 +38,7 @@ class Role
   public static function getRoleById($id)
   {
     $db = new Database('roles');
-    $result = $db->select("id = {$id}");
+    $result = $db->select("id = '{$id}'");
 
     if (is_object($result) && get_class($result) === 'PDOStatement') {
       $result = $result->fetchAll(\PDO::FETCH_OBJ);
@@ -51,8 +51,8 @@ class Role
     $role = new self();
     $roleData = $result[0];
     $role->id = $roleData->id;
-    $role->nome = $roleData->nome;
-    $role->descricao = $roleData->descricao;
+    $role->name = $roleData->name;
+    $role->description = $roleData->description;
     $role->created_at = $roleData->created_at;
 
     return $role;
@@ -61,13 +61,13 @@ class Role
   /**
    * Get role by name
    *
-   * @param string $nome Role name
+   * @param string $name Role name
    * @return Role|null Role object or null if not found
    */
-  public static function getRoleByName($nome)
+  public static function getRoleByName($name)
   {
     $db = new Database('roles');
-    $result = $db->select("nome = '{$nome}'");
+    $result = $db->select("name = '{$name}'");
 
     if (is_object($result) && get_class($result) === 'PDOStatement') {
       $result = $result->fetchAll(\PDO::FETCH_OBJ);
@@ -80,8 +80,8 @@ class Role
     $role = new self();
     $roleData = $result[0];
     $role->id = $roleData->id;
-    $role->nome = $roleData->nome;
-    $role->descricao = $roleData->descricao;
+    $role->name = $roleData->name;
+    $role->description = $roleData->description;
     $role->created_at = $roleData->created_at;
 
     return $role;
@@ -105,8 +105,8 @@ class Role
     foreach ($result as $roleData) {
       $role = new self();
       $role->id = $roleData->id;
-      $role->nome = $roleData->nome;
-      $role->descricao = $roleData->descricao;
+      $role->name = $roleData->name;
+      $role->description = $roleData->description;
       $role->created_at = $roleData->created_at;
       $roles[] = $role;
     }
@@ -141,10 +141,10 @@ class Role
     foreach ($result as $permData) {
       $perm = new Permission();
       $perm->id = $permData->id;
-      $perm->nome = $permData->nome;
-      $perm->descricao = $permData->descricao;
-      $perm->modulo = $permData->modulo;
-      $perm->acao = $permData->acao;
+      $perm->name = $permData->name;
+      $perm->description = $permData->description;
+      $perm->module = $permData->module;
+      $perm->action = $permData->action;
       $permissions[] = $perm;
     }
 
@@ -167,7 +167,7 @@ class Role
     $result = $db->execute(
       "SELECT 1 FROM role_permissions rp
        JOIN permissions p ON rp.permission_id = p.id
-       WHERE rp.role_id = ? AND p.nome = ?",
+       WHERE rp.role_id = ? AND p.name = ?",
       [$this->id, $permissionName]
     );
 
@@ -186,8 +186,8 @@ class Role
   public function create()
   {
     $this->db->insert([
-      'nome' => $this->nome,
-      'descricao' => $this->descricao
+      'name' => $this->name,
+      'description' => $this->description
     ]);
 
     return true;
@@ -205,9 +205,9 @@ class Role
     }
 
     $this->db->update([
-      'nome' => $this->nome,
-      'descricao' => $this->descricao
-    ], "id = {$this->id}");
+      'name' => $this->name,
+      'description' => $this->description
+    ], "id = '{$this->id}'");
 
     return true;
   }
@@ -223,7 +223,7 @@ class Role
       return false;
     }
 
-    $this->db->delete("id = {$this->id}");
+    $this->db->delete("id = '{$this->id}'");
     return true;
   }
 }

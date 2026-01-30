@@ -1,32 +1,33 @@
 <?php
 require BASE_PATH . '/vendor/autoload.php';
 
-use App\Domain\Model\Usuario;
+use App\Domain\Model\User;
 use App\Infrastructure\Container\AppContainer;
 use App\Presentation\View;
 use App\Util\RoleManager;
+use App\Util\IdValidator;
 
 $authService = AppContainer::authService();
 $authService->requireLogin();
-$usuarioLogado = $authService->getUsuarioLogado();
-$usuarioId = $usuarioLogado['id'];
+$loggedUser = $authService->getLoggedUser();
+$userId = $loggedUser['id'];
 
-RoleManager::requirePermission($usuarioId, 'usuario.editar');
+RoleManager::requirePermission($userId, 'user.edit');
 
-$usuarioService = AppContainer::usuarioService();
+$userService = AppContainer::userService();
 $roleService = AppContainer::roleService();
 
-$tituloPagina = 'Cadastrar Usuário';
+$pageTitle = 'Cadastrar Usuário';
 $alerta = null;
 
-$podeAtribuirRole = RoleManager::hasPermission($usuarioId, 'usuario.atribuir_role');
-$roles = $podeAtribuirRole ? $roleService->listRoles() : [];
+$canAssignRole = RoleManager::hasPermission($userId, 'user.assign_role');
+$roles = $canAssignRole ? $roleService->listRoles() : [];
 
-$usuario = new Usuario();
+$user = new User();
 
-if (isset($_POST['nome'], $_POST['email'], $_POST['senha'])) {
+if (isset($_POST['name'], $_POST['email'], $_POST['password'])) {
   $email = $_POST['email'];
-  $existing = $usuarioService->getByEmail($email);
+  $existing = $userService->getByEmail($email);
   if ($existing) {
     $alerta = [
       'tipo' => 'danger',
@@ -34,15 +35,15 @@ if (isset($_POST['nome'], $_POST['email'], $_POST['senha'])) {
       'mensagem' => 'O Email digitado já está em uso.'
     ];
   } else {
-    $usuario->nome = $_POST['nome'];
-    $usuario->email = $email;
-    if ($podeAtribuirRole && isset($_POST['role_id']) && is_numeric($_POST['role_id'])) {
-      $usuario->roleId = (int) $_POST['role_id'];
+    $user->name = $_POST['name'];
+    $user->email = $email;
+    if ($canAssignRole && isset($_POST['role_id']) && IdValidator::isValid($_POST['role_id'])) {
+      $user->roleId = (string) $_POST['role_id'];
     }
 
-    $criado = $usuarioService->create($usuario, $_POST['senha']);
+    $criado = $userService->create($user, $_POST['password']);
     if ($criado) {
-      header('location: index.php?r=usuarios&status=success');
+      header('location: index.php?r=users&status=success');
       exit;
     }
 
@@ -56,11 +57,11 @@ if (isset($_POST['nome'], $_POST['email'], $_POST['senha'])) {
 
 View::render(VIEW_PATH . '/layout/header.php');
 View::render(VIEW_PATH . '/pages/user-form.php', [
-  'usuario' => $usuario,
+  'user' => $user,
   'roles' => $roles,
-  'podeAtribuirRole' => $podeAtribuirRole,
+  'canAssignRole' => $canAssignRole,
   'modo' => 'criar',
-  'tituloPagina' => $tituloPagina,
+  'tituloPagina' => $pageTitle,
   'alerta' => $alerta
 ]);
 View::render(VIEW_PATH . '/layout/footer.php');

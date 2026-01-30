@@ -4,26 +4,26 @@ namespace App\Domain\Model;
 
 class Permission
 {
-  public ?int $id;
-  public string $nome;
-  public string $descricao;
-  public string $modulo;
-  public string $acao;
+  public ?string $id;
+  public string $name;
+  public string $description;
+  public string $module;
+  public string $action;
   public string $createdAt;
 
   public function __construct(
-    ?int $id = null,
-    string $nome = '',
-    string $descricao = '',
-    string $modulo = '',
-    string $acao = '',
+    ?string $id = null,
+    string $name = '',
+    string $description = '',
+    string $module = '',
+    string $action = '',
     string $createdAt = ''
   ) {
     $this->id = $id;
-    $this->nome = $nome;
-    $this->descricao = $descricao;
-    $this->modulo = $modulo;
-    $this->acao = $acao;
+    $this->name = $name;
+    $this->description = $description;
+    $this->module = $module;
+    $this->action = $action;
     $this->createdAt = $createdAt;
   }
 }

@@ -1,5 +1,5 @@
 <?php
-// Expecting: $alerta, $usuarios, $rolesById, $podeEditar, $podeDeletar, $podeCriar, $paginacao, $busca, $queryString
+// Expecting: $alerta, $users, $rolesById, $canEdit, $canDelete, $canCreate, $pagination, $search, $queryString
 ?>
 
 <div class="container-content p-5">
@@ -18,9 +18,9 @@
       </h2>
       <p class="text-muted small mb-0">Gerencie os usuários do sistema</p>
     </div>
-    <?php if ($podeCriar) : ?>
+    <?php if ($canCreate) : ?>
       <div class="col-auto">
-        <a href="index.php?r=usuarios/novo">
+        <a href="index.php?r=users/new">
           <button class="btn btn-primary fw-bold">
             <i class="bi bi-person-plus-fill"></i> Novo Usuário
           </button>
@@ -33,10 +33,10 @@
     <div class="card-body">
       <form method="GET" class="row g-3">
         <div class="col-md-9">
-          <label for="busca" class="form-label text-white">
+          <label for="search" class="form-label text-white">
             <i class="bi bi-search"></i> Buscar por Nome ou Email
           </label>
-          <input type="text" name="busca" id="busca" class="form-control" placeholder="Digite nome ou email..." value="<?= htmlspecialchars($busca) ?>">
+          <input type="text" name="search" id="search" class="form-control" placeholder="Digite nome ou email..." value="<?= htmlspecialchars($search) ?>">
         </div>
         <div class="col-md-3 d-flex align-items-end">
           <button type="submit" class="btn btn-primary w-100 fw-bold">
@@ -60,40 +60,41 @@
           </tr>
         </thead>
         <tbody>
-          <?php if (empty($usuarios)) : ?>
+          <?php if (empty($users)) : ?>
             <tr>
               <td colspan="5" class="text-center text-muted py-4">
                 <i class="bi bi-inbox"></i> Nenhum usuário encontrado.
               </td>
             </tr>
           <?php else : ?>
-            <?php foreach ($usuarios as $usuario) : ?>
+            <?php foreach ($users as $index => $user) : ?>
               <?php
-              $roleNome = $rolesById[$usuario->roleId ?? null] ?? 'Sem role';
+              $roleName = $rolesById[$user->roleId ?? null] ?? 'Sem role';
+              $userId = (string) ($user->id ?? '');
               ?>
               <tr class="align-middle">
-                <td><strong>#<?= (int) $usuario->id ?></strong></td>
-                <td><?= htmlspecialchars($usuario->nome ?? '') ?></td>
-                <td><?= htmlspecialchars($usuario->email ?? '') ?></td>
-                <td><span class="badge bg-secondary"><?= htmlspecialchars($roleNome) ?></span></td>
+                <td><strong>#<?= $index + 1 ?></strong></td>
+                <td><?= htmlspecialchars($user->name ?? '') ?></td>
+                <td><?= htmlspecialchars($user->email ?? '') ?></td>
+                <td><span class="badge bg-secondary"><?= htmlspecialchars($roleName) ?></span></td>
                 <td>
-                  <?php if ($podeEditar) : ?>
-                    <a href="index.php?r=usuarios/editar&id=<?= (int) $usuario->id ?>" class="me-2">
+                  <?php if ($canEdit) : ?>
+                    <a href="index.php?r=users/edit&id=<?= htmlspecialchars($userId) ?>" class="me-2">
                       <button type="button" class="btn btn-primary btn-sm">
                         <i class="bi bi-pencil-fill"></i> Editar
                       </button>
                     </a>
                   <?php endif; ?>
 
-                  <?php if ($podeDeletar) : ?>
-                    <a href="index.php?r=usuarios/excluir&id=<?= (int) $usuario->id ?>">
+                  <?php if ($canDelete) : ?>
+                    <a href="index.php?r=users/delete&id=<?= htmlspecialchars($userId) ?>">
                       <button type="button" class="btn btn-danger btn-sm">
                         <i class="bi bi-trash-fill"></i> Excluir
                       </button>
                     </a>
                   <?php endif; ?>
 
-                  <?php if (!$podeEditar && !$podeDeletar) : ?>
+                  <?php if (!$canEdit && !$canDelete) : ?>
                     <span class="badge bg-secondary">Sem permissões</span>
                   <?php endif; ?>
                 </td>
@@ -105,12 +106,12 @@
     </div>
   </div>
 
-  <?php if (!empty($paginacao)) : ?>
+  <?php if (!empty($pagination)) : ?>
     <div class="d-flex justify-content-center mt-4">
       <nav>
-        <?php foreach ($paginacao as $pagina) : ?>
+        <?php foreach ($pagination as $pagina) : ?>
           <?php $class = $pagina['atual'] ? 'btn-primary' : 'btn-outline-secondary'; ?>
-          <a href="index.php?r=usuarios&pagina=<?= $pagina['pagina'] ?><?= $queryString ? '&' . $queryString : '' ?>">
+          <a href="index.php?r=users&pagina=<?= $pagina['pagina'] ?><?= $queryString ? '&' . $queryString : '' ?>">
             <button type="button" class="btn <?= $class ?> me-2"><?= $pagina['pagina'] ?></button>
           </a>
         <?php endforeach; ?>

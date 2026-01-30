@@ -4,31 +4,33 @@ require BASE_PATH . '/vendor/autoload.php';
 use \App\Util\RoleManager;
 use App\Infrastructure\Container\AppContainer;
 use App\Presentation\View;
+use App\Util\IdValidator;
 
 // Require login
 $authService = AppContainer::authService();
 $authService->requireLogin();
-$usuarioId = $authService->getUsuarioLogado()['id'];
+$userId = $authService->getLoggedUser()['id'];
 
 // Check permission to delete
-RoleManager::requirePermission($usuarioId, 'vaga.deletar');
+RoleManager::requirePermission($userId, 'vacancy.delete');
 
 
-if (!isset($_GET['id']) or !is_numeric($_GET['id'])) {
+$vacancyId = $_GET['id'] ?? null;
+if (!IdValidator::isValid($vacancyId)) {
   header('location: index.php?r=home&status=error');
   exit;
 }
 
-$vagaService = AppContainer::vagaService();
-$obVaga = $vagaService->getById((int) $_GET['id']);
+$vacancyService = AppContainer::vacancyService();
+$vacancy = $vacancyService->getById((string) $vacancyId);
 
-if (!$obVaga) {
+if (!$vacancy) {
   header('location: index.php?r=home&status=error');
   exit;
 }
 
 if (isset($_POST['excluir'])) {
-  $vagaService->delete((int) $obVaga->id);
+  $vacancyService->delete((string) $vacancy->id);
 
 
   header('location: index.php?r=home&status=success');
@@ -37,6 +39,6 @@ if (isset($_POST['excluir'])) {
 
 View::render(VIEW_PATH . '/layout/header.php');
 View::render(VIEW_PATH . '/pages/vacancy-delete-confirm.php', [
-  'obVaga' => $obVaga
+  'vacancy' => $vacancy
 ]);
 View::render(VIEW_PATH . '/layout/footer.php');

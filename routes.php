@@ -2,14 +2,15 @@
 
 return [
   'home' => PAGE_PATH . '/vacancies-index.php',
-  'vagas' => PAGE_PATH . '/vacancies-index.php',
-  'vagas/novo' => PAGE_PATH . '/vacancies-create.php',
-  'vagas/editar' => PAGE_PATH . '/vacancies-edit.php',
-  'vagas/excluir' => PAGE_PATH . '/vacancies-delete.php',
+  'vacancies' => PAGE_PATH . '/vacancies-index.php',
+  'vacancies/new' => PAGE_PATH . '/vacancies-create.php',
+  'vacancies/edit' => PAGE_PATH . '/vacancies-edit.php',
+  'vacancies/delete' => PAGE_PATH . '/vacancies-delete.php',
+  'vacancies/apply' => PAGE_PATH . '/vacancies-apply.php',
   'login' => PAGE_PATH . '/auth.php',
   'logout' => PAGE_PATH . '/logout.php',
-  'usuarios' => PAGE_PATH . '/users-index.php',
-  'usuarios/novo' => PAGE_PATH . '/users-create.php',
-  'usuarios/editar' => PAGE_PATH . '/users-edit.php',
-  'usuarios/excluir' => PAGE_PATH . '/users-delete.php'
+  'users' => PAGE_PATH . '/users-index.php',
+  'users/new' => PAGE_PATH . '/users-create.php',
+  'users/edit' => PAGE_PATH . '/users-edit.php',
+  'users/delete' => PAGE_PATH . '/users-delete.php'
 ];

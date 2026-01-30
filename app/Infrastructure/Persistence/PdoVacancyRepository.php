@@ -3,23 +3,24 @@
 namespace App\Infrastructure\Persistence;
 
 use App\Db\Database;
-use App\Domain\Model\Vaga;
-use App\Domain\Repository\VagaRepositoryInterface;
+use App\Domain\Model\Vacancy;
+use App\Domain\Repository\VacancyRepositoryInterface;
 use App\Util\Logger;
+use App\Util\Uuid;
 use PDO;
 
-class PdoVagaRepository implements VagaRepositoryInterface
+class PdoVacancyRepository implements VacancyRepositoryInterface
 {
   private Database $db;
   private Logger $logger;
 
   public function __construct()
   {
-    $this->db = new Database('vagas');
-    $this->logger = new Logger('vaga');
+    $this->db = new Database('vacancies');
+    $this->logger = new Logger('vacancy');
   }
 
-  /** @return Vaga[] */
+  /** @return Vacancy[] */
   public function findAll(?string $where = null, ?string $order = null, ?string $limit = null): array
   {
     try {
@@ -34,10 +35,10 @@ class PdoVagaRepository implements VagaRepositoryInterface
     }
   }
 
-  public function findById(int $id): ?Vaga
+  public function findById(string $id): ?Vacancy
   {
     try {
-      $row = $this->db->select('id = ' . intval($id))->fetch(PDO::FETCH_ASSOC);
+      $row = $this->db->execute('SELECT * FROM vacancies WHERE id = ?', [$id])->fetch(PDO::FETCH_ASSOC);
       return $row ? $this->mapRow($row) : null;
     } catch (\PDOException $e) {
       $this->logger->error('Failed to fetch vacancy', [
@@ -60,61 +61,64 @@ class PdoVagaRepository implements VagaRepositoryInterface
     }
   }
 
-  public function create(Vaga $vaga): Vaga
+  public function create(Vacancy $vacancy): Vacancy
   {
     try {
-      $vaga->id = (int) $this->db->insert([
-        'titulo' => $vaga->titulo,
-        'descricao' => $vaga->descricao,
-        'ativo' => $vaga->ativo,
-        'data' => $vaga->data
+      if ($vacancy->id === null) {
+        $vacancy->id = Uuid::v4();
+      }
+
+      $this->db->insert([
+        'id' => $vacancy->id,
+        'title' => $vacancy->title,
+        'description' => $vacancy->description,
+        'is_active' => $vacancy->isActive,
+        'created_at' => $vacancy->createdAt
       ]);
 
       $this->logger->info('New vacancy created', [
-        'vacancy_id' => $vaga->id,
-        'title' => $vaga->titulo,
-        'status' => $vaga->ativo
+        'vacancy_id' => $vacancy->id,
+        'title' => $vacancy->title,
+        'status' => $vacancy->isActive
       ]);
     } catch (\PDOException $e) {
       $this->logger->error('Failed to create vacancy', [
         'error' => $e->getMessage(),
-        'title' => $vaga->titulo
+        'title' => $vacancy->title
       ]);
       throw $e;
     }
 
-    return $vaga;
+    return $vacancy;
   }
 
-  public function update(Vaga $vaga): bool
+  public function update(Vacancy $vacancy): bool
   {
     try {
-      $this->db->update('id = ' . intval($vaga->id), [
-        'titulo' => $vaga->titulo,
-        'descricao' => $vaga->descricao,
-        'ativo' => $vaga->ativo,
-        'data' => $vaga->data
-      ]);
+      $this->db->execute(
+        'UPDATE vacancies SET title = ?, description = ?, is_active = ?, created_at = ? WHERE id = ?',
+        [$vacancy->title, $vacancy->description, $vacancy->isActive, $vacancy->createdAt, $vacancy->id]
+      );
 
       $this->logger->info('Vacancy updated', [
-        'vacancy_id' => $vaga->id,
-        'title' => $vaga->titulo
+        'vacancy_id' => $vacancy->id,
+        'title' => $vacancy->title
       ]);
 
       return true;
     } catch (\PDOException $e) {
       $this->logger->error('Failed to update vacancy', [
         'error' => $e->getMessage(),
-        'vacancy_id' => $vaga->id
+        'vacancy_id' => $vacancy->id
       ]);
       throw $e;
     }
   }
 
-  public function delete(int $id): bool
+  public function delete(string $id): bool
   {
     try {
-      $this->db->delete('id = ' . intval($id));
+      $this->db->execute('DELETE FROM vacancies WHERE id = ?', [$id]);
       $this->logger->info('Vacancy deleted', [
         'vacancy_id' => $id
       ]);
@@ -128,14 +132,14 @@ class PdoVagaRepository implements VagaRepositoryInterface
     }
   }
 
-  private function mapRow(array $row): Vaga
+  private function mapRow(array $row): Vacancy
   {
-    return new Vaga(
-      isset($row['id']) ? (int) $row['id'] : null,
-      $row['titulo'] ?? '',
-      $row['descricao'] ?? '',
-      $row['ativo'] ?? 'n',
-      $row['data'] ?? ''
+    return new Vacancy(
+      isset($row['id']) ? (string) $row['id'] : null,
+      $row['title'] ?? '',
+      $row['description'] ?? '',
+      $row['is_active'] ?? 'n',
+      $row['created_at'] ?? ''
     );
   }
 }

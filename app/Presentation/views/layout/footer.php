@@ -28,7 +28,7 @@
 <script>
   // Toggle password visibility
   document.getElementById('toggle-password-login')?.addEventListener('click', function() {
-    const input = document.getElementById('senha-login');
+    const input = document.getElementById('password-login');
     const icon = this.querySelector('i');
     if (input.type === 'password') {
       input.type = 'text';
@@ -42,7 +42,7 @@
   });
 
   document.getElementById('toggle-password-signup')?.addEventListener('click', function() {
-    const input = document.getElementById('senha-signup');
+    const input = document.getElementById('password-signup');
     const icon = this.querySelector('i');
     if (input.type === 'password') {
       input.type = 'text';

@@ -4,34 +4,36 @@ require BASE_PATH . '/vendor/autoload.php';
 use App\Infrastructure\Container\AppContainer;
 use App\Presentation\View;
 use App\Util\RoleManager;
+use App\Util\IdValidator;
 
 $authService = AppContainer::authService();
 $authService->requireLogin();
-$usuarioLogado = $authService->getUsuarioLogado();
-$usuarioId = $usuarioLogado['id'];
+$loggedUser = $authService->getLoggedUser();
+$loggedUserId = $loggedUser['id'];
 
-RoleManager::requirePermission($usuarioId, 'usuario.deletar');
+RoleManager::requirePermission($loggedUserId, 'user.delete');
 
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-  header('location: index.php?r=usuarios&status=error');
+$targetUserId = $_GET['id'] ?? null;
+if (!IdValidator::isValid($targetUserId)) {
+  header('location: index.php?r=users&status=error');
   exit;
 }
 
-$usuarioService = AppContainer::usuarioService();
-$usuario = $usuarioService->getById((int) $_GET['id']);
-if (!$usuario) {
-  header('location: index.php?r=usuarios&status=error');
+$userService = AppContainer::userService();
+$user = $userService->getById((string) $targetUserId);
+if (!$user) {
+  header('location: index.php?r=users&status=error');
   exit;
 }
 
 if (isset($_POST['excluir'])) {
-  $usuarioService->delete((int) $usuario->id);
-  header('location: index.php?r=usuarios&status=success');
+  $userService->delete((string) $user->id);
+  header('location: index.php?r=users&status=success');
   exit;
 }
 
 View::render(VIEW_PATH . '/layout/header.php');
 View::render(VIEW_PATH . '/pages/user-delete-confirm.php', [
-  'usuario' => $usuario
+  'user' => $user
 ]);
 View::render(VIEW_PATH . '/layout/footer.php');

@@ -2,6 +2,7 @@
 
 namespace App\Application\Service;
 
+use App\Application\Exceptions\ForbiddenException;
 use App\Domain\Model\Role;
 use App\Domain\Repository\RolePermissionRepositoryInterface;
 use App\Domain\Repository\RoleRepositoryInterface;
@@ -105,8 +106,7 @@ class RoleService
   public function requirePermission(string $userId, string $permissionName): void
   {
     if (!$this->hasPermission($userId, $permissionName)) {
-      http_response_code(403);
-      die('Você não tem permissão para acessar este recurso.');
+      throw new ForbiddenException('Você não tem permissão para acessar este recurso.');
     }
   }
 }

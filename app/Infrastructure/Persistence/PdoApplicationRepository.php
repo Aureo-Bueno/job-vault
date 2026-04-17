@@ -32,13 +32,13 @@ class PdoApplicationRepository implements ApplicationRepositoryInterface
       ]);
 
       return true;
-    } catch (\PDOException $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to create application', [
         'error' => $e->getMessage(),
         'user_id' => $userId,
         'vacancy_id' => $vacancyId
       ]);
-      return false;
+      throw $e;
     }
   }
 
@@ -51,13 +51,13 @@ class PdoApplicationRepository implements ApplicationRepositoryInterface
       );
 
       return (bool) $stmt->fetchColumn();
-    } catch (\PDOException $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to check application', [
         'error' => $e->getMessage(),
         'user_id' => $userId,
         'vacancy_id' => $vacancyId
       ]);
-      return false;
+      throw $e;
     }
   }
 
@@ -71,12 +71,12 @@ class PdoApplicationRepository implements ApplicationRepositoryInterface
       $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
       return array_map('strval', $rows ?: []);
-    } catch (\PDOException $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to fetch user applications', [
         'error' => $e->getMessage(),
         'user_id' => $userId
       ]);
-      return [];
+      throw $e;
     }
   }
 }

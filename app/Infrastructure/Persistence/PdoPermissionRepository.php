@@ -68,23 +68,19 @@ class PdoPermissionRepository implements PermissionRepositoryInterface
    */
   public function create(Permission $permission): ?string
   {
-    try {
-      if ($permission->id === null) {
-        $permission->id = Uuid::generateV4();
-      }
-
-      $this->db->insert([
-        'id' => $permission->id,
-        'name' => $permission->name,
-        'description' => $permission->description,
-        'module' => $permission->module,
-        'action' => $permission->action
-      ]);
-
-      return $permission->id;
-    } catch (\Throwable $exception) {
-      return null;
+    if ($permission->id === null) {
+      $permission->id = Uuid::generateV4();
     }
+
+    $this->db->insert([
+      'id' => $permission->id,
+      'name' => $permission->name,
+      'description' => $permission->description,
+      'module' => $permission->module,
+      'action' => $permission->action
+    ]);
+
+    return $permission->id;
   }
 
   /**
@@ -96,21 +92,17 @@ class PdoPermissionRepository implements PermissionRepositoryInterface
       return false;
     }
 
-    try {
-      $this->db->execute(
-        'UPDATE permissions SET name = ?, description = ?, module = ?, action = ? WHERE id = ?',
-        [
-          $permission->name,
-          $permission->description,
-          $permission->module,
-          $permission->action,
-          $permission->id
-        ]
-      );
-      return true;
-    } catch (\Throwable $exception) {
-      return false;
-    }
+    $this->db->execute(
+      'UPDATE permissions SET name = ?, description = ?, module = ?, action = ? WHERE id = ?',
+      [
+        $permission->name,
+        $permission->description,
+        $permission->module,
+        $permission->action,
+        $permission->id
+      ]
+    );
+    return true;
   }
 
   /**
@@ -118,12 +110,8 @@ class PdoPermissionRepository implements PermissionRepositoryInterface
    */
   public function delete(string $id): bool
   {
-    try {
-      $this->db->execute('DELETE FROM permissions WHERE id = ?', [$id]);
-      return true;
-    } catch (\Throwable $exception) {
-      return false;
-    }
+    $this->db->execute('DELETE FROM permissions WHERE id = ?', [$id]);
+    return true;
   }
 
   /**

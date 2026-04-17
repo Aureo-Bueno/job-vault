@@ -2,6 +2,8 @@
 
 namespace App\Db;
 
+use App\Db\Exceptions\DatabaseConnectionException;
+use App\Db\Exceptions\DatabaseQueryException;
 use \PDO;
 use \PDOException;
 
@@ -129,7 +131,7 @@ class Database
       );
       $this->connection = self::$sharedConnection;
     } catch (PDOException $e) {
-      throw new \RuntimeException('Database connection failed.', 0, $e);
+      throw new DatabaseConnectionException('Database connection failed.', 0, $e);
     }
   }
 
@@ -143,7 +145,7 @@ class Database
     }
 
     if (!(self::$sharedConnection instanceof PDO)) {
-      throw new \RuntimeException('Database connection is not available.');
+      throw new DatabaseConnectionException('Database connection is not available.');
     }
 
     return self::$sharedConnection;
@@ -191,7 +193,7 @@ class Database
       $statement->execute($params);
       return $statement;
     } catch (PDOException $e) {
-      throw new \RuntimeException('Database query failed.', 0, $e);
+      throw new DatabaseQueryException('Database query failed.', 0, $e);
     }
   }
 

@@ -33,6 +33,7 @@ use App\Db\Pagination;
 use App\Domain\ValueObject\SearchTerm;
 use App\Infrastructure\Container\AppContainer;
 use App\Infrastructure\Persistence\SqlCriteria;
+use App\Presentation\Support\ExceptionHttpMapper;
 use App\Presentation\Support\HttpRedirect;
 use App\Presentation\Support\StatusAlertMapper;
 use App\Presentation\View;
@@ -338,7 +339,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       throw $exception;
     }
 
-    redirectUsers('error', $exception->getMessage());
+    $error = ExceptionHttpMapper::toPayload($exception);
+    http_response_code($error['httpCode']);
+    redirectUsers($error['status'], $error['message']);
   }
 }
 

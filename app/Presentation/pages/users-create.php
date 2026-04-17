@@ -13,9 +13,12 @@ require BASE_PATH . '/vendor/autoload.php';
 use App\Application\Abstractions\CommandBusInterface;
 use App\Application\Abstractions\QueryBusInterface;
 use App\Application\Commands\Users\CreateUserCommand;
+use App\Application\Exceptions\ForbiddenException;
 use App\Application\Queries\Roles\ListRolesQuery;
 use App\Application\Queries\Users\GetUserByEmailQuery;
 use App\Infrastructure\Container\AppContainer;
+use App\Presentation\Support\ExceptionHttpMapper;
+use App\Presentation\Support\HttpRedirect;
 use App\Presentation\View;
 use App\Util\Csrf;
 use App\Util\IdValidator;
@@ -27,11 +30,16 @@ $loggedUser = $authService->getLoggedUser();
 $userId = $loggedUser['id'];
 
 if (!RoleManager::isAdmin($userId)) {
-  http_response_code(403);
-  die('Acesso restrito ao perfil administrador.');
+  $error = ExceptionHttpMapper::toPayload(new ForbiddenException('Acesso restrito ao perfil administrador.'));
+  HttpRedirect::to('index.php?r=vacancies/apply&status=' . $error['status'] . '&message=' . urlencode($error['message']));
 }
 
-RoleManager::requirePermission($userId, 'user.edit');
+try {
+  RoleManager::requirePermission($userId, 'user.edit');
+} catch (\Throwable $exception) {
+  $error = ExceptionHttpMapper::toPayload($exception);
+  HttpRedirect::to('index.php?r=vacancies/apply&status=' . $error['status'] . '&message=' . urlencode($error['message']));
+}
 
 $commandBus = AppContainer::commandBus();
 $queryBus = AppContainer::queryBus();
@@ -114,8 +122,7 @@ function processUserCreation(
     ));
 
     if ($createdUser) {
-      header('location: index.php?r=users&status=success');
-      exit;
+      HttpRedirect::to('index.php?r=users&status=success');
     }
 
     return [
@@ -124,10 +131,6 @@ function processUserCreation(
       'mensagem' => 'Não foi possível criar o usuário.'
     ];
   } catch (\Throwable $exception) {
-    return [
-      'tipo' => 'danger',
-      'icone' => 'bi bi-exclamation-circle-fill',
-      'mensagem' => $exception->getMessage()
-    ];
+    return ExceptionHttpMapper::toAlert($exception);
   }
 }

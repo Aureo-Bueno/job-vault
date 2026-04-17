@@ -12,10 +12,15 @@
 require BASE_PATH . '/vendor/autoload.php';
 
 use App\Application\Commands\Applications\ApplyToVacancyCommand;
+use App\Application\Exceptions\MessageValidationException;
+use App\Application\Exceptions\NotFoundException;
 use App\Application\Queries\Applications\ListAppliedVacancyIdsByUserQuery;
 use App\Application\Queries\Vacancies\GetVacancyByIdQuery;
 use App\Application\Queries\Vacancies\ListVacanciesQuery;
 use App\Infrastructure\Container\AppContainer;
+use App\Presentation\Support\ExceptionHttpMapper;
+use App\Presentation\Support\HttpRedirect;
+use App\Presentation\Support\StatusAlertMapper;
 use App\Presentation\View;
 use App\Util\Csrf;
 use App\Util\IdValidator;
@@ -29,50 +34,40 @@ $queryBus = AppContainer::queryBus();
 $commandBus = AppContainer::commandBus();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  if (!Csrf::validateFromRequest()) {
-    header('Location: index.php?r=vacancies/apply&status=error');
-    exit;
+  try {
+    if (!Csrf::validateFromRequest()) {
+      throw new MessageValidationException('Não foi possível validar a requisição. Tente novamente.');
+    }
+
+    $vacancyId = filter_input(INPUT_POST, 'vacancy_id', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
+    if (!IdValidator::isValid($vacancyId)) {
+      throw new MessageValidationException('Identificador da vaga inválido.');
+    }
+
+    $vacancy = $queryBus->ask(new GetVacancyByIdQuery((string) $vacancyId));
+    if (!$vacancy || ($vacancy->isActive ?? 'n') !== 's') {
+      throw new NotFoundException('A vaga informada não está disponível para candidatura.');
+    }
+
+    $result = $commandBus->dispatch(new ApplyToVacancyCommand($userId, (string) $vacancyId));
+    $status = is_object($result) && isset($result->status) ? (string) $result->status : 'error';
+
+    HttpRedirect::to('index.php?r=vacancies/apply&status=' . urlencode($status));
+  } catch (\Throwable $exception) {
+    $error = ExceptionHttpMapper::toPayload($exception);
+    HttpRedirect::to(
+      'index.php?r=vacancies/apply&status=' . urlencode($error['status']) .
+      '&message=' . urlencode($error['message'])
+    );
   }
-
-  $vacancyId = filter_input(INPUT_POST, 'vacancy_id', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
-
-  if (!IdValidator::isValid($vacancyId)) {
-    header('Location: index.php?r=vacancies/apply&status=error');
-    exit;
-  }
-
-  $vacancy = $queryBus->ask(new GetVacancyByIdQuery((string) $vacancyId));
-  if (!$vacancy || ($vacancy->isActive ?? 'n') !== 's') {
-    header('Location: index.php?r=vacancies/apply&status=error');
-    exit;
-  }
-
-  $result = $commandBus->dispatch(new ApplyToVacancyCommand($userId, (string) $vacancyId));
-  $status = is_object($result) && isset($result->status) ? (string) $result->status : 'error';
-
-  header('Location: index.php?r=vacancies/apply&status=' . $status);
-  exit;
 }
 
 $status = filter_input(INPUT_GET, 'status', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
-$statusAlerts = [
-  'success' => [
-    'tipo' => 'success',
-    'icone' => 'bi bi-check-circle-fill',
-    'mensagem' => 'Candidatura enviada com sucesso!'
-  ],
-  'exists' => [
-    'tipo' => 'info',
-    'icone' => 'bi bi-info-circle-fill',
-    'mensagem' => 'Você já se candidatou a esta vaga.'
-  ],
-  'error' => [
-    'tipo' => 'danger',
-    'icone' => 'bi bi-exclamation-circle-fill',
-    'mensagem' => 'Não foi possível enviar sua candidatura.'
-  ],
-];
-$alerta = $statusAlerts[$status] ?? null;
+$alerta = StatusAlertMapper::from($status);
+$customMessage = trim((string) ($_GET['message'] ?? ''));
+if ($alerta && $customMessage !== '') {
+  $alerta['mensagem'] = $customMessage;
+}
 
 $vacancies = $queryBus->ask(new ListVacanciesQuery("is_active = 's'", 'created_at DESC'));
 $applied = $queryBus->ask(new ListAppliedVacancyIdsByUserQuery((string) $userId));

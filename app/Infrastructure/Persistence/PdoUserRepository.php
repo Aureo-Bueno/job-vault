@@ -26,12 +26,12 @@ class PdoUserRepository implements UserRepositoryInterface
       $result = $this->db->execute('SELECT * FROM users WHERE email = ?', [$email]);
       $row = $result->fetch(PDO::FETCH_ASSOC);
       return $row ? $this->mapRow($row) : null;
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to fetch user by email', [
         'error' => $e->getMessage(),
         'email' => $email
       ]);
-      return null;
+      throw $e;
     }
   }
 
@@ -41,12 +41,12 @@ class PdoUserRepository implements UserRepositoryInterface
       $result = $this->db->execute('SELECT * FROM users WHERE id = ?', [$id]);
       $row = $result->fetch(PDO::FETCH_ASSOC);
       return $row ? $this->mapRow($row) : null;
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to fetch user by id', [
         'error' => $e->getMessage(),
         'user_id' => $id
       ]);
-      return null;
+      throw $e;
     }
   }
 
@@ -61,12 +61,12 @@ class PdoUserRepository implements UserRepositoryInterface
     try {
       $rows = $this->db->select($where, $order, $limit, '*', $params)->fetchAll(PDO::FETCH_ASSOC);
       return array_map([$this, 'mapRow'], $rows);
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to fetch users', [
         'error' => $e->getMessage(),
         'where' => $where
       ]);
-      return [];
+      throw $e;
     }
   }
 
@@ -74,11 +74,11 @@ class PdoUserRepository implements UserRepositoryInterface
   {
     try {
       return $this->db->count($where, $params);
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to count users', [
         'error' => $e->getMessage()
       ]);
-      return 0;
+      throw $e;
     }
   }
 
@@ -102,12 +102,12 @@ class PdoUserRepository implements UserRepositoryInterface
       ]);
 
       return $user->id;
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to create user', [
         'error' => $e->getMessage(),
         'email' => $user->email
       ]);
-      return null;
+      throw $e;
     }
   }
 
@@ -129,12 +129,12 @@ class PdoUserRepository implements UserRepositoryInterface
       $params[] = $user->id;
       $this->db->execute('UPDATE users SET ' . $setClause . ' WHERE id = ?', $params);
       return true;
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to update user', [
         'error' => $e->getMessage(),
         'user_id' => $user->id
       ]);
-      return false;
+      throw $e;
     }
   }
 
@@ -143,12 +143,12 @@ class PdoUserRepository implements UserRepositoryInterface
     try {
       $this->db->execute('DELETE FROM users WHERE id = ?', [$id]);
       return true;
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to delete user', [
         'error' => $e->getMessage(),
         'user_id' => $id
       ]);
-      return false;
+      throw $e;
     }
   }
 
@@ -159,11 +159,11 @@ class PdoUserRepository implements UserRepositoryInterface
       $result = $dbRoles->execute("SELECT id FROM roles WHERE name = 'usuario' LIMIT 1");
       $row = $result->fetch(PDO::FETCH_ASSOC);
       return $row ? (string) $row['id'] : null;
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to get default role', [
         'error' => $e->getMessage()
       ]);
-      return null;
+      throw $e;
     }
   }
 

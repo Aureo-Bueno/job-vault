@@ -17,6 +17,7 @@ use App\Db\Pagination;
 use App\Domain\ValueObject\SearchTerm;
 use App\Infrastructure\Container\AppContainer;
 use App\Infrastructure\Persistence\SqlCriteria;
+use App\Presentation\Support\HttpRedirect;
 use App\Presentation\Support\StatusAlertMapper;
 use App\Presentation\View;
 use App\Util\RoleManager;
@@ -30,8 +31,7 @@ $userId = $loggedUser['id'];
 $isAdmin = RoleManager::isAdmin($userId);
 $isManager = RoleManager::isManager($userId);
 if (!$isAdmin && !$isManager) {
-  header('Location: index.php?r=vacancies/apply');
-  exit;
+  HttpRedirect::to('index.php?r=vacancies/apply');
 }
 
 RoleManager::requirePermission($userId, 'vacancy.view');
@@ -42,6 +42,10 @@ $statusFilter = in_array($statusFilter, ['s', 'n'], true) ? $statusFilter : '';
 
 $status = filter_input(INPUT_GET, 'status', FILTER_SANITIZE_FULL_SPECIAL_CHARS) ?? '';
 $alerta = StatusAlertMapper::from($status);
+$customMessage = trim((string) ($_GET['message'] ?? ''));
+if ($alerta && $customMessage !== '') {
+  $alerta['mensagem'] = $customMessage;
+}
 
 $criteria = new SqlCriteria();
 $searchTerm = SearchTerm::fromString($search);

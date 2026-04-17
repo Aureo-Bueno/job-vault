@@ -56,21 +56,17 @@ class PdoRoleRepository implements RoleRepositoryInterface
    */
   public function create(Role $role): ?string
   {
-    try {
-      if ($role->id === null) {
-        $role->id = Uuid::generateV4();
-      }
-
-      $this->db->insert([
-        'id' => $role->id,
-        'name' => $role->name,
-        'description' => $role->description
-      ]);
-
-      return $role->id;
-    } catch (\Throwable $exception) {
-      return null;
+    if ($role->id === null) {
+      $role->id = Uuid::generateV4();
     }
+
+    $this->db->insert([
+      'id' => $role->id,
+      'name' => $role->name,
+      'description' => $role->description
+    ]);
+
+    return $role->id;
   }
 
   /**
@@ -82,15 +78,11 @@ class PdoRoleRepository implements RoleRepositoryInterface
       return false;
     }
 
-    try {
-      $this->db->execute(
-        'UPDATE roles SET name = ?, description = ? WHERE id = ?',
-        [$role->name, $role->description, $role->id]
-      );
-      return true;
-    } catch (\Throwable $exception) {
-      return false;
-    }
+    $this->db->execute(
+      'UPDATE roles SET name = ?, description = ? WHERE id = ?',
+      [$role->name, $role->description, $role->id]
+    );
+    return true;
   }
 
   /**
@@ -98,12 +90,8 @@ class PdoRoleRepository implements RoleRepositoryInterface
    */
   public function delete(string $id): bool
   {
-    try {
-      $this->db->execute('DELETE FROM roles WHERE id = ?', [$id]);
-      return true;
-    } catch (\Throwable $exception) {
-      return false;
-    }
+    $this->db->execute('DELETE FROM roles WHERE id = ?', [$id]);
+    return true;
   }
 
   /**

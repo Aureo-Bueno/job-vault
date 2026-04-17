@@ -13,10 +13,14 @@ require BASE_PATH . '/vendor/autoload.php';
 use App\Application\Abstractions\CommandBusInterface;
 use App\Application\Abstractions\QueryBusInterface;
 use App\Application\Commands\Users\UpdateUserCommand;
+use App\Application\Exceptions\ForbiddenException;
 use App\Application\Queries\Roles\ListRolesQuery;
 use App\Application\Queries\Users\GetUserByEmailQuery;
 use App\Application\Queries\Users\GetUserByIdQuery;
+use App\Application\Exceptions\NotFoundException;
 use App\Infrastructure\Container\AppContainer;
+use App\Presentation\Support\ExceptionHttpMapper;
+use App\Presentation\Support\HttpRedirect;
 use App\Presentation\View;
 use App\Util\Csrf;
 use App\Util\IdValidator;
@@ -28,16 +32,21 @@ $loggedUser = $authService->getLoggedUser();
 $loggedUserId = $loggedUser['id'];
 
 if (!RoleManager::isAdmin($loggedUserId)) {
-  http_response_code(403);
-  die('Acesso restrito ao perfil administrador.');
+  $error = ExceptionHttpMapper::toPayload(new ForbiddenException('Acesso restrito ao perfil administrador.'));
+  HttpRedirect::to('index.php?r=vacancies/apply&status=' . $error['status'] . '&message=' . urlencode($error['message']));
 }
 
-RoleManager::requirePermission($loggedUserId, 'user.edit');
+try {
+  RoleManager::requirePermission($loggedUserId, 'user.edit');
+} catch (\Throwable $exception) {
+  $error = ExceptionHttpMapper::toPayload($exception);
+  HttpRedirect::to('index.php?r=vacancies/apply&status=' . $error['status'] . '&message=' . urlencode($error['message']));
+}
 
 $targetUserId = $_GET['id'] ?? null;
 if (!IdValidator::isValid($targetUserId)) {
-  header('location: index.php?r=users&status=error');
-  exit;
+  $error = ExceptionHttpMapper::toPayload(new NotFoundException('Usuário não encontrado para edição.'));
+  HttpRedirect::to('index.php?r=users&status=' . $error['status'] . '&message=' . urlencode($error['message']));
 }
 
 $commandBus = AppContainer::commandBus();
@@ -45,8 +54,8 @@ $queryBus = AppContainer::queryBus();
 
 $user = $queryBus->ask(new GetUserByIdQuery((string) $targetUserId));
 if (!$user) {
-  header('location: index.php?r=users&status=error');
-  exit;
+  $error = ExceptionHttpMapper::toPayload(new NotFoundException('Usuário não encontrado para edição.'));
+  HttpRedirect::to('index.php?r=users&status=' . $error['status'] . '&message=' . urlencode($error['message']));
 }
 
 $pageTitle = 'Editar Usuário';
@@ -127,8 +136,7 @@ function processUserUpdate(
     ));
 
     if ($updated) {
-      header('location: index.php?r=users&status=success');
-      exit;
+      HttpRedirect::to('index.php?r=users&status=success');
     }
 
     return [
@@ -137,10 +145,6 @@ function processUserUpdate(
       'mensagem' => 'Não foi possível atualizar o usuário.'
     ];
   } catch (\Throwable $exception) {
-    return [
-      'tipo' => 'danger',
-      'icone' => 'bi bi-exclamation-circle-fill',
-      'mensagem' => $exception->getMessage()
-    ];
+    return ExceptionHttpMapper::toAlert($exception);
   }
 }

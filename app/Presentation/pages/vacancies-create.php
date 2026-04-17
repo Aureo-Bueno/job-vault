@@ -11,7 +11,11 @@
 require BASE_PATH . '/vendor/autoload.php';
 
 use App\Application\Commands\Vacancies\CreateVacancyCommand;
+use App\Application\Exceptions\MessageValidationException;
+use App\Application\Exceptions\OperationFailedException;
 use App\Infrastructure\Container\AppContainer;
+use App\Presentation\Support\ExceptionHttpMapper;
+use App\Presentation\Support\HttpRedirect;
 use App\Presentation\View;
 use App\Util\Csrf;
 use App\Util\RoleManager;
@@ -32,28 +36,33 @@ $vacancy = (object) [
 ];
 
 if (isset($_POST['title'], $_POST['description'], $_POST['is_active'])) {
-  if (!Csrf::validateFromRequest()) {
-    header('location: index.php?r=home&status=error');
-    exit;
+  try {
+    if (!Csrf::validateFromRequest()) {
+      throw new MessageValidationException('Não foi possível validar a requisição. Tente novamente.');
+    }
+
+    $vacancy->title = (string) $_POST['title'];
+    $vacancy->description = (string) $_POST['description'];
+    $vacancy->isActive = (string) $_POST['is_active'];
+
+    $created = $commandBus->dispatch(new CreateVacancyCommand(
+      $vacancy->title,
+      $vacancy->description,
+      $vacancy->isActive
+    ));
+
+    if (!$created) {
+      throw new OperationFailedException('Não foi possível criar a vaga.');
+    }
+
+    HttpRedirect::to('index.php?r=home&status=success');
+  } catch (\Throwable $exception) {
+    $error = ExceptionHttpMapper::toPayload($exception);
+    HttpRedirect::to(
+      'index.php?r=home&status=' . urlencode($error['status']) .
+      '&message=' . urlencode($error['message'])
+    );
   }
-
-  $vacancy->title = (string) $_POST['title'];
-  $vacancy->description = (string) $_POST['description'];
-  $vacancy->isActive = (string) $_POST['is_active'];
-
-  $created = $commandBus->dispatch(new CreateVacancyCommand(
-    $vacancy->title,
-    $vacancy->description,
-    $vacancy->isActive
-  ));
-
-  if (!$created) {
-    header('location: index.php?r=home&status=error');
-    exit;
-  }
-
-  header('location: index.php?r=home&status=success');
-  exit;
 }
 
 View::render(VIEW_PATH . '/layout/header.php');

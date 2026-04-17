@@ -32,12 +32,12 @@ class PdoVacancyRepository implements VacancyRepositoryInterface
       $statement = $this->database->select($where, $order, $limit, '*', $params);
       $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
       return array_map([$this, 'mapRow'], $rows);
-    } catch (\PDOException $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to fetch vacancies', [
         'error' => $e->getMessage(),
         'where' => $where
       ]);
-      return [];
+      throw $e;
     }
   }
 
@@ -47,12 +47,12 @@ class PdoVacancyRepository implements VacancyRepositoryInterface
       $statement = $this->database->execute('SELECT * FROM vacancies WHERE id = ?', [$id]);
       $row = $statement->fetch(PDO::FETCH_ASSOC);
       return $row ? $this->mapRow($row) : null;
-    } catch (\PDOException $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to fetch vacancy', [
         'error' => $e->getMessage(),
         'vacancy_id' => $id
       ]);
-      return null;
+      throw $e;
     }
   }
 
@@ -60,11 +60,11 @@ class PdoVacancyRepository implements VacancyRepositoryInterface
   {
     try {
       return $this->database->count($where, $params);
-    } catch (\PDOException $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to count vacancies', [
         'error' => $e->getMessage()
       ]);
-      return 0;
+      throw $e;
     }
   }
 
@@ -88,7 +88,7 @@ class PdoVacancyRepository implements VacancyRepositoryInterface
         'title' => $vacancy->title,
         'status' => $vacancy->isActive
       ]);
-    } catch (\PDOException $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to create vacancy', [
         'error' => $e->getMessage(),
         'title' => $vacancy->title
@@ -113,7 +113,7 @@ class PdoVacancyRepository implements VacancyRepositoryInterface
       ]);
 
       return true;
-    } catch (\PDOException $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to update vacancy', [
         'error' => $e->getMessage(),
         'vacancy_id' => $vacancy->id
@@ -130,7 +130,7 @@ class PdoVacancyRepository implements VacancyRepositoryInterface
         'vacancy_id' => $id
       ]);
       return true;
-    } catch (\PDOException $e) {
+    } catch (\Throwable $e) {
       $this->logger->error('Failed to delete vacancy', [
         'error' => $e->getMessage(),
         'vacancy_id' => $id

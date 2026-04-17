@@ -11,8 +11,13 @@
 require BASE_PATH . '/vendor/autoload.php';
 
 use App\Application\Commands\Vacancies\DeleteVacancyCommand;
+use App\Application\Exceptions\MessageValidationException;
+use App\Application\Exceptions\NotFoundException;
+use App\Application\Exceptions\OperationFailedException;
 use App\Application\Queries\Vacancies\GetVacancyByIdQuery;
 use App\Infrastructure\Container\AppContainer;
+use App\Presentation\Support\ExceptionHttpMapper;
+use App\Presentation\Support\HttpRedirect;
 use App\Presentation\View;
 use App\Util\Csrf;
 use App\Util\IdValidator;
@@ -26,7 +31,8 @@ RoleManager::requirePermission($userId, 'vacancy.delete');
 
 $vacancyId = $_GET['id'] ?? null;
 if (!IdValidator::isValid($vacancyId)) {
-  header('location: index.php?r=home&status=error');
+  $error = ExceptionHttpMapper::toPayload(new NotFoundException('Vaga não encontrada para exclusão.'));
+  HttpRedirect::to('index.php?r=home&status=' . $error['status'] . '&message=' . urlencode($error['message']));
   exit;
 }
 
@@ -35,24 +41,30 @@ $commandBus = AppContainer::commandBus();
 $vacancy = $queryBus->ask(new GetVacancyByIdQuery((string) $vacancyId));
 
 if (!$vacancy) {
-  header('location: index.php?r=home&status=error');
+  $error = ExceptionHttpMapper::toPayload(new NotFoundException('Vaga não encontrada para exclusão.'));
+  HttpRedirect::to('index.php?r=home&status=' . $error['status'] . '&message=' . urlencode($error['message']));
   exit;
 }
 
 if (isset($_POST['excluir'])) {
-  if (!Csrf::validateFromRequest()) {
-    header('location: index.php?r=home&status=error');
-    exit;
-  }
+  try {
+    if (!Csrf::validateFromRequest()) {
+      throw new MessageValidationException('Não foi possível validar a requisição. Tente novamente.');
+    }
 
-  $deleted = $commandBus->dispatch(new DeleteVacancyCommand((string) $vacancy->id));
-  if (!$deleted) {
-    header('location: index.php?r=home&status=error');
-    exit;
-  }
+    $deleted = $commandBus->dispatch(new DeleteVacancyCommand((string) $vacancy->id));
+    if (!$deleted) {
+      throw new OperationFailedException('Não foi possível excluir a vaga.');
+    }
 
-  header('location: index.php?r=home&status=success');
-  exit;
+    HttpRedirect::to('index.php?r=home&status=success');
+  } catch (\Throwable $exception) {
+    $error = ExceptionHttpMapper::toPayload($exception);
+    HttpRedirect::to(
+      'index.php?r=home&status=' . urlencode($error['status']) .
+      '&message=' . urlencode($error['message'])
+    );
+  }
 }
 
 View::render(VIEW_PATH . '/layout/header.php');

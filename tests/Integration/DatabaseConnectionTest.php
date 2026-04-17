@@ -13,7 +13,7 @@ class DatabaseConnectionTest extends TestCase
       $this->markTestSkipped('Integration tests disabled. Set RUN_INTEGRATION=1 to enable.');
     }
 
-    $db = new Database('usuarios');
+    $db = new Database('users');
     $result = $db->select(null, null, '1');
 
     $this->assertNotFalse($result);

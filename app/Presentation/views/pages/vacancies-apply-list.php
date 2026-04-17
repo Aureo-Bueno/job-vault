@@ -2,65 +2,69 @@
 // Expecting: $alerta, $vacancies, $appliedMap
 ?>
 
-<div class="container-content p-5">
+<section class="container-content page-section p-3 p-lg-4">
   <?php if (!empty($alerta)) : ?>
-    <div class="alert alert-<?= htmlspecialchars($alerta['tipo']) ?> alert-dismissible fade show" role="alert">
-      <i class="<?= htmlspecialchars($alerta['icone']) ?>"></i>
+    <div class="alert alert-<?= htmlspecialchars($alerta['tipo']) ?> alert-dismissible fade show mb-4" role="alert" data-auto-close="true">
+      <i class="<?= htmlspecialchars($alerta['icone']) ?> me-1"></i>
       <?= htmlspecialchars($alerta['mensagem']) ?>
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
     </div>
   <?php endif; ?>
 
-  <div class="row mb-4 align-items-center">
-    <div class="col">
-      <h2 class="text-white fw-bold">
-        <i class="bi bi-send-check-fill text-success"></i> Candidatar-se às Vagas
-      </h2>
-      <p class="text-muted small mb-0">Clique em candidatar para enviar sua inscrição</p>
+  <div class="section-head">
+    <div>
+      <h2 class="section-title"><i class="bi bi-send-check-fill text-success"></i> Candidaturas abertas</h2>
+      <p class="section-subtitle">Escolha uma vaga ativa e envie sua candidatura em um clique.</p>
     </div>
   </div>
 
   <div class="card">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
-        <thead class="border-bottom">
+      <table class="table table-hover align-middle">
+        <thead>
           <tr>
-            <th class="text-white fw-bold"><i class="bi bi-file-earmark-text"></i> Título</th>
-            <th class="text-white fw-bold"><i class="bi bi-file-text"></i> Descrição</th>
-            <th class="text-white fw-bold"><i class="bi bi-calendar-event"></i> Data</th>
-            <th class="text-white fw-bold"><i class="bi bi-check-circle"></i> Ação</th>
+            <th>Título</th>
+            <th>Descrição</th>
+            <th>Publicada em</th>
+            <th class="text-end">Ação</th>
           </tr>
         </thead>
         <tbody>
           <?php if (empty($vacancies)) : ?>
             <tr>
-              <td colspan="4" class="text-center text-muted py-4">
+              <td colspan="4" class="empty-state">
                 <i class="bi bi-inbox"></i> Nenhuma vaga ativa disponível no momento.
               </td>
             </tr>
           <?php else : ?>
             <?php foreach ($vacancies as $vacancy) : ?>
               <?php
-              $shortDescription = substr($vacancy->description ?? '', 0, 60);
+              $rawDescription = trim((string) ($vacancy->description ?? ''));
+              $shortDescription = strlen($rawDescription) > 80 ? substr($rawDescription, 0, 80) . '...' : $rawDescription;
               $formattedDate = !empty($vacancy->createdAt) ? date('d/m/Y H:i', strtotime($vacancy->createdAt)) : '-';
               $vacancyId = (string) ($vacancy->id ?? '');
               $alreadyApplied = $vacancyId !== '' && isset($appliedMap[$vacancyId]);
               ?>
-              <tr class="align-middle">
+              <tr>
                 <td><strong><?= htmlspecialchars($vacancy->title ?? '') ?></strong></td>
-                <td class="text-muted small"><?= htmlspecialchars($shortDescription) ?>...</td>
-                <td class="small"><?= $formattedDate ?></td>
+                <td class="text-muted small"><?= htmlspecialchars($shortDescription) ?></td>
+                <td class="small text-nowrap"><?= htmlspecialchars($formattedDate) ?></td>
                 <td>
-                  <?php if ($alreadyApplied) : ?>
-                    <span class="badge bg-success">Candidatura enviada</span>
-                  <?php else : ?>
-                    <form method="POST" class="d-inline">
-                      <input type="hidden" name="vacancy_id" value="<?= htmlspecialchars($vacancyId) ?>">
-                      <button type="submit" class="btn btn-success btn-sm">
-                        <i class="bi bi-send"></i> Candidatar
-                      </button>
-                    </form>
-                  <?php endif; ?>
+                  <div class="d-flex justify-content-end">
+                    <?php if ($alreadyApplied) : ?>
+                      <span class="badge status-badge bg-success">
+                        <i class="bi bi-check2-circle me-1"></i>Candidatura enviada
+                      </span>
+                    <?php else : ?>
+                      <form method="POST" class="d-inline">
+                        <?= \App\Util\Csrf::input() ?>
+                        <input type="hidden" name="vacancy_id" value="<?= htmlspecialchars($vacancyId) ?>">
+                        <button type="submit" class="btn btn-success btn-sm">
+                          <i class="bi bi-send"></i> Candidatar
+                        </button>
+                      </form>
+                    <?php endif; ?>
+                  </div>
                 </td>
               </tr>
             <?php endforeach; ?>
@@ -69,4 +73,4 @@
       </table>
     </div>
   </div>
-</div>
+</section>

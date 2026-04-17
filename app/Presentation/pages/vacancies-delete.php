@@ -1,19 +1,28 @@
 <?php
+
+/**
+ * Vacancy deletion page controller.
+ *
+ * Access rules:
+ * - authenticated user;
+ * - requires `vacancy.delete` permission.
+ */
+
 require BASE_PATH . '/vendor/autoload.php';
 
-use \App\Util\RoleManager;
+use App\Application\Commands\Vacancies\DeleteVacancyCommand;
+use App\Application\Queries\Vacancies\GetVacancyByIdQuery;
 use App\Infrastructure\Container\AppContainer;
 use App\Presentation\View;
+use App\Util\Csrf;
 use App\Util\IdValidator;
+use App\Util\RoleManager;
 
-// Require login
 $authService = AppContainer::authService();
 $authService->requireLogin();
 $userId = $authService->getLoggedUser()['id'];
 
-// Check permission to delete
 RoleManager::requirePermission($userId, 'vacancy.delete');
-
 
 $vacancyId = $_GET['id'] ?? null;
 if (!IdValidator::isValid($vacancyId)) {
@@ -21,8 +30,9 @@ if (!IdValidator::isValid($vacancyId)) {
   exit;
 }
 
-$vacancyService = AppContainer::vacancyService();
-$vacancy = $vacancyService->getById((string) $vacancyId);
+$queryBus = AppContainer::queryBus();
+$commandBus = AppContainer::commandBus();
+$vacancy = $queryBus->ask(new GetVacancyByIdQuery((string) $vacancyId));
 
 if (!$vacancy) {
   header('location: index.php?r=home&status=error');
@@ -30,8 +40,16 @@ if (!$vacancy) {
 }
 
 if (isset($_POST['excluir'])) {
-  $vacancyService->delete((string) $vacancy->id);
+  if (!Csrf::validateFromRequest()) {
+    header('location: index.php?r=home&status=error');
+    exit;
+  }
 
+  $deleted = $commandBus->dispatch(new DeleteVacancyCommand((string) $vacancy->id));
+  if (!$deleted) {
+    header('location: index.php?r=home&status=error');
+    exit;
+  }
 
   header('location: index.php?r=home&status=success');
   exit;

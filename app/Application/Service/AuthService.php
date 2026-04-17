@@ -2,10 +2,14 @@
 
 namespace App\Application\Service;
 
+use App\Domain\Entity\UserAccount;
 use App\Domain\Model\User;
 use App\Domain\Repository\UserRepositoryInterface;
 use App\Util\Logger;
 
+/**
+ * Handles authentication, registration and session lifecycle operations.
+ */
 class AuthService
 {
   private UserRepositoryInterface $userRepository;
@@ -17,53 +21,69 @@ class AuthService
     $this->logger = new Logger('login');
   }
 
+  /**
+   * Authenticates credentials and returns the corresponding user model.
+   */
   public function authenticate(string $email, string $password): ?User
   {
-    $user = $this->userRepository->findByEmail($email);
+    $loginAttempt = UserAccount::register('auth-user', $email, $password);
+    $loginUserEntity = $loginAttempt['entity'] ?? null;
+    if (!$loginUserEntity) {
+      return null;
+    }
 
+    $user = $this->userRepository->findByEmail($loginUserEntity->email());
     if (!$user) {
       return null;
     }
 
-    return password_verify($password, $user->password) ? $user : null;
+    $existingUserEntity = UserAccount::restore($user);
+    if (!$existingUserEntity) {
+      return null;
+    }
+
+    if (!$existingUserEntity->authenticate($password)) {
+      return null;
+    }
+
+    return $existingUserEntity->toModel();
   }
 
-  /** @return array{user:?User,error:?string} */
+  /**
+   * Registers a new user and returns either the created user or an error message.
+   *
+   * @return array{user:?User,error:?string}
+   */
   public function register(string $name, string $email, string $password): array
   {
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-      return ['user' => null, 'error' => 'Email inválido'];
+    $registration = UserAccount::register($name, $email, $password);
+    $newUserEntity = $registration['entity'] ?? null;
+    if (!$newUserEntity) {
+      return ['user' => null, 'error' => $registration['error'] ?? 'Dados inválidos'];
     }
 
-    if (strlen($password) < 6) {
-      return ['user' => null, 'error' => 'A senha deve ter no mínimo 6 caracteres'];
-    }
-
-    $existing = $this->userRepository->findByEmail($email);
+    $existing = $this->userRepository->findByEmail($newUserEntity->email());
     if ($existing) {
       return ['user' => null, 'error' => 'O Email digitado já está em uso'];
     }
 
-    $user = new User(
-      null,
-      $name,
-      $email,
-      password_hash($password, PASSWORD_DEFAULT),
-      null
-    );
-
+    $user = $newUserEntity->toModel();
     $id = $this->userRepository->create($user);
     if (!$id) {
       return ['user' => null, 'error' => 'Não foi possível criar o usuário'];
     }
 
-    $user->id = $id;
-    return ['user' => $user, 'error' => null];
+    $newUserEntity->setId($id);
+    return ['user' => $newUserEntity->toModel(), 'error' => null];
   }
 
+  /**
+   * Starts authenticated session data and redirects user to home.
+   */
   public function login(User $user): void
   {
     $this->initSession();
+    session_regenerate_id(true);
 
     $roleId = $user->roleId ?? ($user->role_id ?? null);
 
@@ -90,12 +110,30 @@ class AuthService
     exit;
   }
 
+  /**
+   * Destroys active session and redirects to login route.
+   */
   public function logout(): void
   {
     $this->initSession();
 
     $userEmail = $_SESSION['user']['email'] ?? 'unknown';
-    unset($_SESSION['user']);
+    $_SESSION = [];
+
+    if (ini_get('session.use_cookies')) {
+      $params = session_get_cookie_params();
+      setcookie(
+        session_name(),
+        '',
+        time() - 42000,
+        $params['path'] ?? '/',
+        $params['domain'] ?? '',
+        (bool) ($params['secure'] ?? false),
+        (bool) ($params['httponly'] ?? true)
+      );
+    }
+
+    session_destroy();
 
     $logger = $this->logger;
     register_shutdown_function(function () use ($logger, $userEmail) {
@@ -109,18 +147,27 @@ class AuthService
     exit;
   }
 
+  /**
+   * Returns logged user payload stored in session.
+   */
   public function getLoggedUser(): ?array
   {
     $this->initSession();
     return $this->isLogged() ? $_SESSION['user'] : null;
   }
 
+  /**
+   * Checks whether session has an authenticated user.
+   */
   public function isLogged(): bool
   {
     $this->initSession();
     return isset($_SESSION['user']['id']);
   }
 
+  /**
+   * Enforces authentication and redirects to login when missing.
+   */
   public function requireLogin(): void
   {
     if (!$this->isLogged()) {
@@ -134,6 +181,9 @@ class AuthService
     }
   }
 
+  /**
+   * Enforces guest-only routes and redirects logged users to home.
+   */
   public function requireLogout(): void
   {
     if ($this->isLogged()) {
@@ -142,10 +192,34 @@ class AuthService
     }
   }
 
+  /**
+   * Initializes PHP session with secure cookie defaults.
+   */
   private function initSession(): void
   {
     if (session_status() !== PHP_SESSION_ACTIVE) {
+      session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'domain' => '',
+        'secure' => $this->isSecureRequest(),
+        'httponly' => true,
+        'samesite' => 'Lax',
+      ]);
       session_start();
     }
+  }
+
+  /**
+   * Detects whether current HTTP request is using HTTPS.
+   */
+  private function isSecureRequest(): bool
+  {
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+      return true;
+    }
+
+    $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
+    return strtolower((string) $forwardedProto) === 'https';
   }
 }

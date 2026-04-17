@@ -8,16 +8,16 @@ use App\Domain\Repository\RolePermissionRepositoryInterface;
 
 class FakeRolePermissionRepository implements RolePermissionRepositoryInterface
 {
-  /** @var array<int,string[]> */
+  /** @var array<string,string[]> */
   private array $rolePermissions = [];
 
-  public function setPermissions(int $roleId, array $permissionNames): void
+  public function setPermissions(string $roleId, array $permissionNames): void
   {
     $this->rolePermissions[$roleId] = $permissionNames;
   }
 
   /** @return Permission[] */
-  public function getPermissionsByRoleId(int $roleId): array
+  public function getPermissionsByRoleId(string $roleId): array
   {
     $names = $this->rolePermissions[$roleId] ?? [];
     $permissions = [];
@@ -29,23 +29,23 @@ class FakeRolePermissionRepository implements RolePermissionRepositoryInterface
     return $permissions;
   }
 
-  public function roleHasPermission(int $roleId, string $permissionName): bool
+  public function roleHasPermission(string $roleId, string $permissionName): bool
   {
     return in_array($permissionName, $this->rolePermissions[$roleId] ?? [], true);
   }
 
   /** @return Role[] */
-  public function getRolesByPermissionId(int $permissionId): array
+  public function getRolesByPermissionId(string $permissionId): array
   {
     return [];
   }
 
-  public function assignPermissionToRole(int $roleId, int $permissionId): bool
+  public function assignPermissionToRole(string $roleId, string $permissionId): bool
   {
     return true;
   }
 
-  public function removePermissionFromRole(int $roleId, int $permissionId): bool
+  public function removePermissionFromRole(string $roleId, string $permissionId): bool
   {
     return true;
   }

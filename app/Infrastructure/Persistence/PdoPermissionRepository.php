@@ -5,8 +5,12 @@ namespace App\Infrastructure\Persistence;
 use App\Db\Database;
 use App\Domain\Model\Permission;
 use App\Domain\Repository\PermissionRepositoryInterface;
+use App\Util\Uuid;
 use PDO;
 
+/**
+ * PDO implementation for permission persistence operations.
+ */
 class PdoPermissionRepository implements PermissionRepositoryInterface
 {
   private Database $db;
@@ -16,6 +20,9 @@ class PdoPermissionRepository implements PermissionRepositoryInterface
     $this->db = new Database('permissions');
   }
 
+  /**
+   * {@inheritDoc}
+   */
   public function findById(string $id): ?Permission
   {
     $result = $this->db->execute('SELECT * FROM permissions WHERE id = ?', [$id]);
@@ -23,6 +30,9 @@ class PdoPermissionRepository implements PermissionRepositoryInterface
     return $row ? $this->mapRow($row) : null;
   }
 
+  /**
+   * {@inheritDoc}
+   */
   public function findByName(string $name): ?Permission
   {
     $result = $this->db->execute('SELECT * FROM permissions WHERE name = ? LIMIT 1', [$name]);
@@ -30,21 +40,95 @@ class PdoPermissionRepository implements PermissionRepositoryInterface
     return $row ? $this->mapRow($row) : null;
   }
 
-  /** @return Permission[] */
+  /**
+   * {@inheritDoc}
+   *
+   * @return Permission[]
+   */
   public function findAll(): array
   {
-    $rows = $this->db->select()->fetchAll(PDO::FETCH_ASSOC);
+    $rows = $this->db->select(null, 'module ASC, action ASC, name ASC')->fetchAll(PDO::FETCH_ASSOC);
     return array_map([$this, 'mapRow'], $rows);
   }
 
-  /** @return Permission[] */
+  /**
+   * {@inheritDoc}
+   *
+   * @return Permission[]
+   */
   public function findByModule(string $module): array
   {
-    $result = $this->db->execute('SELECT * FROM permissions WHERE module = ?', [$module]);
+    $result = $this->db->execute('SELECT * FROM permissions WHERE module = ? ORDER BY action ASC', [$module]);
     $rows = $result->fetchAll(PDO::FETCH_ASSOC);
     return array_map([$this, 'mapRow'], $rows);
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  public function create(Permission $permission): ?string
+  {
+    try {
+      if ($permission->id === null) {
+        $permission->id = Uuid::generateV4();
+      }
+
+      $this->db->insert([
+        'id' => $permission->id,
+        'name' => $permission->name,
+        'description' => $permission->description,
+        'module' => $permission->module,
+        'action' => $permission->action
+      ]);
+
+      return $permission->id;
+    } catch (\Throwable $exception) {
+      return null;
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  public function update(Permission $permission): bool
+  {
+    if ($permission->id === null) {
+      return false;
+    }
+
+    try {
+      $this->db->execute(
+        'UPDATE permissions SET name = ?, description = ?, module = ?, action = ? WHERE id = ?',
+        [
+          $permission->name,
+          $permission->description,
+          $permission->module,
+          $permission->action,
+          $permission->id
+        ]
+      );
+      return true;
+    } catch (\Throwable $exception) {
+      return false;
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  public function delete(string $id): bool
+  {
+    try {
+      $this->db->execute('DELETE FROM permissions WHERE id = ?', [$id]);
+      return true;
+    } catch (\Throwable $exception) {
+      return false;
+    }
+  }
+
+  /**
+   * Maps a database row into a Permission model instance.
+   */
   private function mapRow(array $row): Permission
   {
     return new Permission(

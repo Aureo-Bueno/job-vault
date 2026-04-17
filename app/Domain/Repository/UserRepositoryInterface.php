@@ -11,9 +11,14 @@ interface UserRepositoryInterface
   public function findById(string $id): ?User;
 
   /** @return User[] */
-  public function findAll(?string $where = null, ?string $order = null, ?string $limit = null): array;
+  public function findAll(
+    ?string $where = null,
+    ?string $order = null,
+    ?string $limit = null,
+    array $params = []
+  ): array;
 
-  public function count(?string $where = null): int;
+  public function count(?string $where = null, array $params = []): int;
 
   public function create(User $user): ?string;
 

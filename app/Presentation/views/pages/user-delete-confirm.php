@@ -2,22 +2,28 @@
 // Expecting: $user
 ?>
 
-<main class="container-content p-5">
-  <h2 class="mt-3 text-white fw-bold">Excluir Usuário</h2>
+<section class="container-content page-section p-3 p-lg-4">
+  <div class="section-head">
+    <div>
+      <h2 class="section-title"><i class="bi bi-trash-fill text-danger"></i> Excluir usuário</h2>
+      <p class="section-subtitle">Essa ação remove o usuário e não pode ser desfeita.</p>
+    </div>
+  </div>
 
-  <form method="POST" class="mt-4">
-    <div class="card">
-      <div class="card-body">
-        <p class="text-muted">
-          Você deseja realmente excluir o usuário <strong><?= htmlspecialchars($user->name ?? '') ?></strong>?
-        </p>
-        <div class="d-flex gap-3">
-          <a href="index.php?r=users" class="btn btn-outline-secondary">
-            Cancelar
-          </a>
-          <button type="submit" name="excluir" class="btn btn-danger">Excluir</button>
-        </div>
+  <form method="POST" class="card">
+    <?= \App\Util\Csrf::input() ?>
+    <div class="card-body p-4">
+      <p class="text-muted mb-4">
+        Confirmar exclusão de <strong class="text-white"><?= htmlspecialchars($user->name ?? '') ?></strong>?
+      </p>
+      <div class="d-flex flex-wrap gap-2">
+        <a href="index.php?r=users" class="btn btn-outline-secondary">
+          Cancelar
+        </a>
+        <button type="submit" name="excluir" class="btn btn-danger">
+          <i class="bi bi-trash-fill"></i> Excluir usuário
+        </button>
       </div>
     </div>
   </form>
-</main>
+</section>

@@ -51,10 +51,15 @@ class PdoUserRepository implements UserRepositoryInterface
   }
 
   /** @return User[] */
-  public function findAll(?string $where = null, ?string $order = null, ?string $limit = null): array
+  public function findAll(
+    ?string $where = null,
+    ?string $order = null,
+    ?string $limit = null,
+    array $params = []
+  ): array
   {
     try {
-      $rows = $this->db->select($where, $order, $limit)->fetchAll(PDO::FETCH_ASSOC);
+      $rows = $this->db->select($where, $order, $limit, '*', $params)->fetchAll(PDO::FETCH_ASSOC);
       return array_map([$this, 'mapRow'], $rows);
     } catch (\Exception $e) {
       $this->logger->error('Failed to fetch users', [
@@ -65,10 +70,10 @@ class PdoUserRepository implements UserRepositoryInterface
     }
   }
 
-  public function count(?string $where = null): int
+  public function count(?string $where = null, array $params = []): int
   {
     try {
-      return $this->db->count($where);
+      return $this->db->count($where, $params);
     } catch (\Exception $e) {
       $this->logger->error('Failed to count users', [
         'error' => $e->getMessage()
@@ -85,7 +90,7 @@ class PdoUserRepository implements UserRepositoryInterface
       }
 
       if ($user->id === null) {
-        $user->id = Uuid::v4();
+        $user->id = Uuid::generateV4();
       }
 
       $this->db->insert([

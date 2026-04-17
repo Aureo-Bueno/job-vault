@@ -149,9 +149,19 @@ INSERT INTO `permissions` (`id`, `name`, `description`, `module`, `action`) VALU
 (UUID(), 'vacancy.publish', 'Publicar/Ativar vagas', 'vacancy', 'publish'),
 (UUID(), 'vacancy.manage', 'Gerenciar todas as vagas', 'vacancy', 'manage'),
 (UUID(), 'user.list', 'Listar usuários', 'user', 'list'),
+(UUID(), 'user.create', 'Criar usuários', 'user', 'create'),
 (UUID(), 'user.edit', 'Editar usuários', 'user', 'edit'),
 (UUID(), 'user.delete', 'Deletar usuários', 'user', 'delete'),
-(UUID(), 'user.assign_role', 'Atribuir roles a usuários', 'user', 'assign_role');
+(UUID(), 'user.assign_role', 'Atribuir roles a usuários', 'user', 'assign_role'),
+(UUID(), 'role.list', 'Listar roles', 'role', 'list'),
+(UUID(), 'role.create', 'Criar roles', 'role', 'create'),
+(UUID(), 'role.edit', 'Editar roles', 'role', 'edit'),
+(UUID(), 'role.delete', 'Remover roles', 'role', 'delete'),
+(UUID(), 'role.assign_permission', 'Vincular permissões em roles', 'role', 'assign_permission'),
+(UUID(), 'permission.list', 'Listar permissões', 'permission', 'list'),
+(UUID(), 'permission.create', 'Criar permissões', 'permission', 'create'),
+(UUID(), 'permission.edit', 'Editar permissões', 'permission', 'edit'),
+(UUID(), 'permission.delete', 'Remover permissões', 'permission', 'delete');
 
 -- ============================================
 -- 13. ASSIGN PERMISSIONS TO ADMIN ROLE

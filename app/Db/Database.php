@@ -17,33 +17,40 @@ use \PDOException;
 class Database
 {
   /**
+   * Shared PDO connection used by all Database instances.
+   *
+   * @var PDO|null
+   */
+  private static ?PDO $sharedConnection = null;
+
+  /**
    * Database host address
    * Use 'mysql' when running in Docker, 'localhost' for local development
    *
    * @var string
    */
-  const HOST = 'mysql';
+  private const DEFAULT_HOST = 'mysql';
 
   /**
    * Database name
    *
    * @var string
    */
-  const NAME = 'myapp_db';
+  private const DEFAULT_NAME = 'myapp_db';
 
   /**
    * Database user/username
    *
    * @var string
    */
-  const USER = 'appuser';
+  private const DEFAULT_USER = 'appuser';
 
   /**
    * Database password
    *
    * @var string
    */
-  const PASS = 'app_password';
+  private const DEFAULT_PASS = 'app_password';
 
   /**
    * Database port
@@ -51,7 +58,7 @@ class Database
    *
    * @var int
    */
-  const PORT = 3306;
+  private const DEFAULT_PORT = 3306;
 
   /**
    * Current table name for query operations
@@ -93,25 +100,63 @@ class Database
    */
   private function setConnection()
   {
+    if (self::$sharedConnection instanceof PDO) {
+      $this->connection = self::$sharedConnection;
+      return;
+    }
+
     try {
-      $dsn = 'mysql:host=' . self::HOST .
-        ';port=' . self::PORT .
-        ';dbname=' . self::NAME .
+      $host = $this->env('DB_HOST', self::DEFAULT_HOST);
+      $port = $this->env('DB_PORT', (string) self::DEFAULT_PORT);
+      $database = $this->env('DB_NAME', self::DEFAULT_NAME);
+      $user = $this->env('DB_USER', self::DEFAULT_USER);
+      $password = $this->env('DB_PASSWORD', self::DEFAULT_PASS);
+
+      $dsn = 'mysql:host=' . $host .
+        ';port=' . $port .
+        ';dbname=' . $database .
         ';charset=utf8mb4';
 
-      $this->connection = new PDO(
+      self::$sharedConnection = new PDO(
         $dsn,
-        self::USER,
-        self::PASS,
+        $user,
+        $password,
         [
           PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
           PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
           PDO::ATTR_EMULATE_PREPARES => false,
         ]
       );
+      $this->connection = self::$sharedConnection;
     } catch (PDOException $e) {
-      die('DATABASE ERROR: ' . $e->getMessage());
+      throw new \RuntimeException('Database connection failed.', 0, $e);
     }
+  }
+
+  /**
+   * Returns the shared PDO connection instance.
+   */
+  public static function sharedConnection(): PDO
+  {
+    if (!(self::$sharedConnection instanceof PDO)) {
+      new self();
+    }
+
+    if (!(self::$sharedConnection instanceof PDO)) {
+      throw new \RuntimeException('Database connection is not available.');
+    }
+
+    return self::$sharedConnection;
+  }
+
+  private function env(string $key, string $default = ''): string
+  {
+    $value = getenv($key);
+    if ($value === false || $value === '') {
+      return $default;
+    }
+
+    return $value;
   }
 
   /**
@@ -146,7 +191,7 @@ class Database
       $statement->execute($params);
       return $statement;
     } catch (PDOException $e) {
-      die('QUERY ERROR: ' . $e->getMessage());
+      throw new \RuntimeException('Database query failed.', 0, $e);
     }
   }
 
@@ -220,7 +265,7 @@ class Database
    * @return \PDOStatement Result set containing fetched records
    * @throws PDOException If select fails
    */
-  public function select($where = null, $order = null, $limit = null, $fields = '*')
+  public function select($where = null, $order = null, $limit = null, $fields = '*', $params = [])
   {
     // Build conditional clauses (PHP 8.1+ safe: check null before strlen)
     $where = !is_null($where) && strlen($where) ? 'WHERE ' . $where : '';
@@ -232,7 +277,7 @@ class Database
       $where . ' ' . $order . ' ' . $limit;
 
     // Execute and return statement
-    return $this->execute($query);
+    return $this->execute($query, $params);
   }
 
   /**
@@ -336,12 +381,12 @@ class Database
    * @param string|null $where Optional WHERE clause
    * @return int Number of matching records
    */
-  public function count($where = null)
+  public function count($where = null, $params = [])
   {
     $where = !is_null($where) && strlen($where) ? 'WHERE ' . $where : '';
     $query = 'SELECT COUNT(*) as total FROM ' . $this->table . ' ' . $where;
 
-    $result = $this->execute($query);
+    $result = $this->execute($query, $params);
     $row = $result->fetch();
 
     return (int) $row['total'];

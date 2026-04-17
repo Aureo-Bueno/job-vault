@@ -7,6 +7,9 @@ use App\Domain\Repository\RolePermissionRepositoryInterface;
 use App\Domain\Repository\RoleRepositoryInterface;
 use App\Domain\Repository\UserRepositoryInterface;
 
+/**
+ * Exposes role and permission checks used by presentation and utility layers.
+ */
 class RoleService
 {
   private UserRepositoryInterface $userRepository;
@@ -23,6 +26,9 @@ class RoleService
     $this->rolePermissionRepository = $rolePermissionRepository;
   }
 
+  /**
+   * Checks whether a user has a specific permission name.
+   */
   public function hasPermission(string $userId, string $permissionName): bool
   {
     $user = $this->userRepository->findById($userId);
@@ -34,7 +40,11 @@ class RoleService
     return $this->rolePermissionRepository->roleHasPermission($user->roleId, $permissionName);
   }
 
-  /** @return string[] */
+  /**
+   * Returns permission names assigned to a role.
+   *
+   * @return string[]
+   */
   public function getPermissionsByRole(string $roleId): array
   {
     $permissions = $this->rolePermissionRepository->getPermissionsByRoleId($roleId);
@@ -47,6 +57,9 @@ class RoleService
     return $permissionNames;
   }
 
+  /**
+   * Returns the role currently assigned to a user.
+   */
   public function getUserRole(string $userId): ?Role
   {
     $user = $this->userRepository->findById($userId);
@@ -58,24 +71,37 @@ class RoleService
     return $this->roleRepository->findById($user->roleId);
   }
 
-  /** @return Role[] */
+  /**
+   * Returns every role in the system.
+   *
+   * @return Role[]
+   */
   public function listRoles(): array
   {
     return $this->roleRepository->findAll();
   }
 
+  /**
+   * Checks whether a user is assigned to the `admin` role.
+   */
   public function isAdmin(string $userId): bool
   {
     $role = $this->getUserRole($userId);
     return $role && $role->name === 'admin';
   }
 
+  /**
+   * Checks whether a user is assigned to the `gestor` role.
+   */
   public function isManager(string $userId): bool
   {
     $role = $this->getUserRole($userId);
     return $role && $role->name === 'gestor';
   }
 
+  /**
+   * Enforces permission check and terminates request with 403 when unauthorized.
+   */
   public function requirePermission(string $userId, string $permissionName): void
   {
     if (!$this->hasPermission($userId, $permissionName)) {

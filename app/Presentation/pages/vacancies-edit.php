@@ -1,49 +1,63 @@
 <?php
+
+/**
+ * Vacancy edition page controller.
+ *
+ * Access rules:
+ * - authenticated user;
+ * - requires `vacancy.edit` permission.
+ */
+
 require BASE_PATH . '/vendor/autoload.php';
 
-use \App\Util\RoleManager;
+use App\Application\Commands\Vacancies\UpdateVacancyCommand;
+use App\Application\Queries\Vacancies\GetVacancyByIdQuery;
 use App\Infrastructure\Container\AppContainer;
 use App\Presentation\View;
+use App\Util\Csrf;
 use App\Util\IdValidator;
+use App\Util\RoleManager;
 
-// Require login
 $authService = AppContainer::authService();
 $authService->requireLogin();
 $userId = $authService->getLoggedUser()['id'];
 
-// Check permission to create/edit
 RoleManager::requirePermission($userId, 'vacancy.edit');
 
 $pageTitle = 'Editar vaga';
 
-//VALIDA O ID
 $vacancyId = $_GET['id'] ?? null;
 if (!IdValidator::isValid($vacancyId)) {
   header('location: index.php?r=home&status=error');
   exit;
 }
 
-//CONSULTA A VAGA
-$vacancyService = AppContainer::vacancyService();
-$vacancy = $vacancyService->getById((string) $vacancyId);
+$queryBus = AppContainer::queryBus();
+$commandBus = AppContainer::commandBus();
+$vacancy = $queryBus->ask(new GetVacancyByIdQuery((string) $vacancyId));
 
-// VALIDAR A VAGA
 if (!$vacancy) {
   header('location: index.php?r=home&status=error');
   exit;
 }
 
-
-
-
-//VALIDAÇAO DO POST
 if (isset($_POST['title'], $_POST['description'], $_POST['is_active'])) {
+  if (!Csrf::validateFromRequest()) {
+    header('location: index.php?r=home&status=error');
+    exit;
+  }
 
-  $vacancy->title = $_POST['title'];
-  $vacancy->description = $_POST['description'];
-  $vacancy->isActive = $_POST['is_active'];
-  $vacancyService->update($vacancy);
+  $updated = $commandBus->dispatch(new UpdateVacancyCommand(
+    (string) $vacancy->id,
+    (string) $_POST['title'],
+    (string) $_POST['description'],
+    (string) $_POST['is_active']
+  ));
 
+  if (!$updated) {
+    header('location: index.php?r=home&status=error');
+    exit;
+  }
 
   header('location: index.php?r=home&status=success');
   exit;

@@ -2,9 +2,13 @@
 
 namespace App\Application\Service;
 
+use App\Domain\Entity\VacancyPosting;
 use App\Domain\Model\Vacancy;
 use App\Domain\Repository\VacancyRepositoryInterface;
 
+/**
+ * Provides vacancy management use cases.
+ */
 class VacancyService
 {
   private VacancyRepositoryInterface $vacancyRepository;
@@ -14,36 +18,60 @@ class VacancyService
     $this->vacancyRepository = $vacancyRepository;
   }
 
-  /** @return Vacancy[] */
-  public function list(?string $where = null, ?string $order = null, ?string $limit = null): array
+  /**
+   * Lists vacancies with optional filtering, ordering and pagination.
+   *
+   * @return Vacancy[]
+   */
+  public function list(
+    ?string $where = null,
+    ?string $order = null,
+    ?string $limit = null,
+    array $params = []
+  ): array
   {
-    return $this->vacancyRepository->findAll($where, $order, $limit);
+    return $this->vacancyRepository->findAll($where, $order, $limit, $params);
   }
 
-  public function count(?string $where = null): int
+  /**
+   * Counts vacancies using optional criteria.
+   */
+  public function count(?string $where = null, array $params = []): int
   {
-    return $this->vacancyRepository->count($where);
+    return $this->vacancyRepository->count($where, $params);
   }
 
+  /**
+   * Fetches a vacancy by identifier.
+   */
   public function getById(string $id): ?Vacancy
   {
     return $this->vacancyRepository->findById($id);
   }
 
+  /**
+   * Creates a vacancy after normalizing input through the domain entity.
+   */
   public function create(Vacancy $vacancy): Vacancy
   {
-    if ($vacancy->createdAt === '') {
-      $vacancy->createdAt = date('Y-m-d H:i:s');
-    }
+    $vacancyEntity = VacancyPosting::fromModel($vacancy);
+    $normalizedVacancy = $vacancyEntity->toModel();
 
-    return $this->vacancyRepository->create($vacancy);
+    return $this->vacancyRepository->create($normalizedVacancy);
   }
 
+  /**
+   * Updates a vacancy after normalizing input through the domain entity.
+   */
   public function update(Vacancy $vacancy): bool
   {
-    return $this->vacancyRepository->update($vacancy);
+    $vacancyEntity = VacancyPosting::fromModel($vacancy);
+    return $this->vacancyRepository->update($vacancyEntity->toModel());
   }
 
+  /**
+   * Deletes a vacancy by identifier.
+   */
   public function delete(string $id): bool
   {
     return $this->vacancyRepository->delete($id);

@@ -28,20 +28,23 @@ Layered organization (Clean Architecture-inspired):
 
 ## Main routes
 - `index.php?r=home` (vacancies)
-- `index.php?r=vagas/novo`
-- `index.php?r=vagas/editar&id=1`
-- `index.php?r=vagas/excluir&id=1`
-- `index.php?r=usuarios`
-- `index.php?r=usuarios/novo`
-- `index.php?r=usuarios/editar&id=1`
-- `index.php?r=usuarios/excluir&id=1`
+- `index.php?r=vacancies`
+- `index.php?r=vacancies/new`
+- `index.php?r=vacancies/edit&id=<uuid>`
+- `index.php?r=vacancies/delete&id=<uuid>`
+- `index.php?r=vacancies/apply`
+- `index.php?r=users`
+- `index.php?r=users/new`
+- `index.php?r=users/edit&id=<uuid>`
+- `index.php?r=users/delete&id=<uuid>`
 - `index.php?r=login`
 - `index.php?r=logout`
 
 ## Run with Docker
 ```bash
-docker-compose build
-docker-compose up -d
+cp .env.example .env
+docker compose build
+docker compose up -d
 ```
 
 Open: `http://localhost:8080/index.php?r=home`
@@ -54,5 +57,5 @@ Open: `http://localhost:8080/index.php?r=home`
 
 Install test dependencies:
 ```bash
-docker-compose exec php_app composer install
+docker compose exec php composer install
 ```

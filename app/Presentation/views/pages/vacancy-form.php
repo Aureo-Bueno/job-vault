@@ -1,114 +1,81 @@
 <?php
-$tituloFormulario = $tituloPagina ?? (defined('TITLE') ? TITLE : '');
+$tituloFormulario = $tituloPagina ?? (defined('TITLE') ? TITLE : 'Formulário de vaga');
+$isActiveValue = $vacancy->isActive ?? 's';
 ?>
 
-<div class="container-content p-5">
-  <div class="row mb-4">
-    <div class="col">
-      <h2 class="text-white fw-bold">
-        <i class="bi bi-plus-circle-fill text-primary"></i> <?= htmlspecialchars($tituloFormulario) ?>
-      </h2>
-      <p class="text-muted small mb-0">Preencha os dados para criar uma nova vaga</p>
+<section class="container-content page-section p-3 p-lg-4">
+  <div class="section-head">
+    <div>
+      <h2 class="section-title"><i class="bi bi-briefcase-fill text-info"></i> <?= htmlspecialchars($tituloFormulario) ?></h2>
+      <p class="section-subtitle">Defina título, descrição e status para publicar a vaga com consistência.</p>
     </div>
-    <div class="col-auto">
-      <a href="index.php?r=home">
-        <button type="button" class="btn btn-outline-secondary">
-          <i class="bi bi-arrow-left"></i> Voltar
-        </button>
-      </a>
-    </div>
+    <a href="index.php?r=home" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Voltar
+    </a>
   </div>
 
-  <!-- Form Card -->
   <div class="card">
-    <div class="card-body p-4">
+    <div class="card-body p-4 p-lg-5">
       <form method="POST" class="needs-validation" novalidate>
+        <?= \App\Util\Csrf::input() ?>
 
-        <!-- Título -->
         <div class="mb-4">
-          <label for="title" class="form-label text-white fw-bold">
-            <i class="bi bi-file-earmark-text"></i> Título da Vaga
+          <label for="title" class="form-label">
+            <i class="bi bi-file-earmark-text"></i> Título da vaga <span class="text-danger">*</span>
           </label>
           <input
             type="text"
             class="form-control form-control-lg"
             id="title"
             name="title"
-            placeholder="Ex: Desenvolvedor PHP Senior"
+            placeholder="Ex: Desenvolvedor(a) PHP Sênior"
             value="<?= htmlspecialchars($vacancy->title ?? '') ?>"
             required>
-          <div class="invalid-feedback text-danger d-block">
-            Por favor, informe um título para a vaga.
-          </div>
-          <small class="text-muted d-block mt-2">
-            <i class="bi bi-info-circle"></i> Título deve ser claro e descritivo
-          </small>
+          <div class="invalid-feedback" role="alert">Informe o título da vaga.</div>
         </div>
 
-        <!-- Descrição -->
         <div class="mb-4">
-          <label for="description" class="form-label text-white fw-bold">
-            <i class="bi bi-file-text"></i> Descrição da Vaga
+          <label for="description" class="form-label">
+            <i class="bi bi-file-text"></i> Descrição da vaga <span class="text-danger">*</span>
           </label>
           <textarea
             class="form-control"
             id="description"
             name="description"
             rows="8"
-            placeholder="Descreva os detalhes da vaga, responsabilidades, requisitos..."
+            placeholder="Descreva atividades, responsabilidades, requisitos e benefícios..."
             required><?= htmlspecialchars($vacancy->description ?? '') ?></textarea>
-          <div class="invalid-feedback text-danger d-block">
-            Por favor, informe uma descrição para a vaga.
-          </div>
+          <div class="invalid-feedback" role="alert">Informe uma descrição para a vaga.</div>
           <small class="text-muted d-block mt-2">
-            <i class="bi bi-info-circle"></i> Seja detalhista para atrair candidatos qualificados
+            Quanto mais objetiva a descrição, melhor a qualidade das candidaturas.
           </small>
         </div>
 
-        <!-- Status -->
         <div class="mb-4">
-          <label class="form-label text-white fw-bold">
-            <i class="bi bi-toggle-on"></i> Status da Vaga
-          </label>
-          <div class="btn-group w-100" role="group">
-            <input
-              type="radio"
-              class="btn-check"
-              name="is_active"
-              id="active-yes"
-              value="s"
-              <?= ($vacancy->isActive ?? 's') == 's' ? 'checked' : '' ?>>
-            <label class="btn btn-outline-success fw-bold" for="active-yes">
-              <i class="bi bi-check-circle-fill"></i> Ativa
-            </label>
-
-            <input
-              type="radio"
-              class="btn-check"
-              name="is_active"
-              id="active-no"
-              value="n"
-              <?= ($vacancy->isActive ?? '') == 'n' ? 'checked' : '' ?>>
-            <label class="btn btn-outline-danger fw-bold" for="active-no">
-              <i class="bi bi-x-circle-fill"></i> Inativa
-            </label>
+          <label class="form-label"><i class="bi bi-toggle-on"></i> Status da vaga</label>
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <input type="radio" class="btn-check" name="is_active" id="active-yes" value="s" <?= $isActiveValue === 's' ? 'checked' : '' ?>>
+              <label class="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center" for="active-yes">
+                <span><i class="bi bi-check-circle-fill text-success me-1"></i> Ativa</span>
+                <small class="text-muted">Visível para candidatos</small>
+              </label>
+            </div>
+            <div class="col-12 col-md-6">
+              <input type="radio" class="btn-check" name="is_active" id="active-no" value="n" <?= $isActiveValue === 'n' ? 'checked' : '' ?>>
+              <label class="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center" for="active-no">
+                <span><i class="bi bi-pause-circle-fill text-danger me-1"></i> Inativa</span>
+                <small class="text-muted">Oculta para candidatos</small>
+              </label>
+            </div>
           </div>
-          <small class="text-muted d-block mt-2">
-            <i class="bi bi-info-circle"></i> Vagas ativas aparecem para candidatos
-          </small>
         </div>
 
-        <!-- Divider -->
-        <hr class="bg-secondary opacity-25 my-4">
-
-        <!-- Buttons -->
-        <div class="d-flex gap-3 pt-2">
-          <button
-            type="submit"
-            class="btn btn-primary btn-lg fw-bold flex-grow-1">
-            <i class="bi bi-check-lg"></i> Enviar
+        <div class="d-flex flex-wrap gap-2 pt-4 mt-2 border-top border-secondary-subtle">
+          <button type="submit" class="btn btn-primary px-4">
+            <i class="bi bi-check-lg"></i> Salvar vaga
           </button>
-          <a href="index.php?r=home" class="btn btn-outline-secondary btn-lg fw-bold">
+          <a href="index.php?r=home" class="btn btn-outline-secondary px-4">
             <i class="bi bi-x-lg"></i> Cancelar
           </a>
         </div>
@@ -116,30 +83,9 @@ $tituloFormulario = $tituloPagina ?? (defined('TITLE') ? TITLE : '');
     </div>
   </div>
 
-  <!-- Info Box -->
-  <div class="alert alert-info alert-dismissible fade show mt-4" role="alert">
-    <i class="bi bi-lightbulb-fill"></i>
-    <strong>Dica:</strong> Preencha todos os campos corretamente para que sua vaga fique atrativa para os candidatos. Revise os dados antes de confirmar.
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  <div class="alert alert-info alert-dismissible fade show mt-4" role="alert" data-auto-close="true">
+    <i class="bi bi-lightbulb-fill me-1"></i>
+    Revise o texto antes de salvar para evitar vagas com descrição incompleta.
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
   </div>
-</div>
-
-<script>
-  // Form validation
-  document.querySelector('form').addEventListener('submit', function(e) {
-    if (!this.checkValidity()) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    this.classList.add('was-validated');
-  }, false);
-
-  // Auto-close info alert after 10 seconds
-  const infoAlert = document.querySelector('.alert-info');
-  if (infoAlert) {
-    setTimeout(() => {
-      const bsAlert = new bootstrap.Alert(infoAlert);
-      bsAlert.close();
-    }, 10000);
-  }
-</script>
+</section>

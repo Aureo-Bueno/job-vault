@@ -11,20 +11,26 @@ use PDO;
 
 class PdoVacancyRepository implements VacancyRepositoryInterface
 {
-  private Database $db;
+  private Database $database;
   private Logger $logger;
 
   public function __construct()
   {
-    $this->db = new Database('vacancies');
+    $this->database = new Database('vacancies');
     $this->logger = new Logger('vacancy');
   }
 
   /** @return Vacancy[] */
-  public function findAll(?string $where = null, ?string $order = null, ?string $limit = null): array
+  public function findAll(
+    ?string $where = null,
+    ?string $order = null,
+    ?string $limit = null,
+    array $params = []
+  ): array
   {
     try {
-      $rows = $this->db->select($where, $order, $limit)->fetchAll(PDO::FETCH_ASSOC);
+      $statement = $this->database->select($where, $order, $limit, '*', $params);
+      $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
       return array_map([$this, 'mapRow'], $rows);
     } catch (\PDOException $e) {
       $this->logger->error('Failed to fetch vacancies', [
@@ -38,7 +44,8 @@ class PdoVacancyRepository implements VacancyRepositoryInterface
   public function findById(string $id): ?Vacancy
   {
     try {
-      $row = $this->db->execute('SELECT * FROM vacancies WHERE id = ?', [$id])->fetch(PDO::FETCH_ASSOC);
+      $statement = $this->database->execute('SELECT * FROM vacancies WHERE id = ?', [$id]);
+      $row = $statement->fetch(PDO::FETCH_ASSOC);
       return $row ? $this->mapRow($row) : null;
     } catch (\PDOException $e) {
       $this->logger->error('Failed to fetch vacancy', [
@@ -49,10 +56,10 @@ class PdoVacancyRepository implements VacancyRepositoryInterface
     }
   }
 
-  public function count(?string $where = null): int
+  public function count(?string $where = null, array $params = []): int
   {
     try {
-      return $this->db->count($where);
+      return $this->database->count($where, $params);
     } catch (\PDOException $e) {
       $this->logger->error('Failed to count vacancies', [
         'error' => $e->getMessage()
@@ -65,10 +72,10 @@ class PdoVacancyRepository implements VacancyRepositoryInterface
   {
     try {
       if ($vacancy->id === null) {
-        $vacancy->id = Uuid::v4();
+        $vacancy->id = Uuid::generateV4();
       }
 
-      $this->db->insert([
+      $this->database->insert([
         'id' => $vacancy->id,
         'title' => $vacancy->title,
         'description' => $vacancy->description,
@@ -95,7 +102,7 @@ class PdoVacancyRepository implements VacancyRepositoryInterface
   public function update(Vacancy $vacancy): bool
   {
     try {
-      $this->db->execute(
+      $this->database->execute(
         'UPDATE vacancies SET title = ?, description = ?, is_active = ?, created_at = ? WHERE id = ?',
         [$vacancy->title, $vacancy->description, $vacancy->isActive, $vacancy->createdAt, $vacancy->id]
       );
@@ -118,7 +125,7 @@ class PdoVacancyRepository implements VacancyRepositoryInterface
   public function delete(string $id): bool
   {
     try {
-      $this->db->execute('DELETE FROM vacancies WHERE id = ?', [$id]);
+      $this->database->execute('DELETE FROM vacancies WHERE id = ?', [$id]);
       $this->logger->info('Vacancy deleted', [
         'vacancy_id' => $id
       ]);

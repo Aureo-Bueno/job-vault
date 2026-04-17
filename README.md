@@ -42,8 +42,8 @@ flowchart TD
     L --> M[Domain<br/>Entities / Models / ValueObjects]
     L --> N[Repository Interfaces]
     N --> O[Infrastructure Repositories<br/>PDO Implementations]
-    O --> P[Database (PDO)]
-    P --> Q[(MySQL)]
+    O --> P[Database PDO]
+    P --> Q[MySQL]
 ```
 
 ## Methodologies and patterns

@@ -20,6 +20,32 @@ Layered organization (Clean Architecture-inspired):
   - `views/` (layouts and pages)
 - `public/index.php`: front controller (routes via `?r=`)
 
+## Architecture diagram
+```mermaid
+flowchart TD
+    A[Browser / Client] --> B[public/index.php<br/>Front Controller]
+    B --> C[routes.php]
+    C --> D[Presentation Pages<br/>app/Presentation/pages]
+    D --> E[Presentation Views<br/>app/Presentation/views]
+    D --> F[AppContainer]
+
+    F --> G[CommandBus]
+    F --> H[QueryBus]
+    F --> I[AuthService / RoleService]
+
+    G --> J[Application Features<br/>Command Handlers]
+    H --> K[Application Features<br/>Query Handlers]
+
+    J --> L[Application Services]
+    K --> L
+
+    L --> M[Domain<br/>Entities / Models / ValueObjects]
+    L --> N[Repository Interfaces]
+    N --> O[Infrastructure Repositories<br/>PDO Implementations]
+    O --> P[Database (PDO)]
+    P --> Q[(MySQL)]
+```
+
 ## Methodologies and patterns
 - Layered separation (Domain / Application / Infrastructure / Presentation)
 - Services for business rules

@@ -1,0 +1,128 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use App\Application\Commands\Vacancies\CloseExpiredVacanciesCommand;
+use App\Application\DTOs\VacancyDto;
+use App\Infrastructure\Container\AppContainer;
+use App\Infrastructure\Persistence\Database;
+use App\Infrastructure\Persistence\Search\VacancySearchIndexer;
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+const USAGE = <<<'TXT'
+Usage: php bin/console <command> [options]
+
+Commands:
+  vacancies:close-expired      Close open vacancies whose application deadline has passed
+  vacancies:reindex-search     Rebuild the full-text search document of every vacancy
+                               (after changing the tokenizer or inserting vacancies with raw SQL)
+  schedule:work [--interval=N] Run the scheduled jobs now and then every N seconds
+                               (default: SCHEDULER_INTERVAL or 3600). Used by the
+                               `scheduler` service in docker-compose.yml.
+
+Environment: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, SCHEDULER_INTERVAL
+
+TXT;
+
+$args = array_slice($argv, 1);
+$command = $args[0] ?? '';
+
+$out = static function (string $line): void {
+  fwrite(STDOUT, '[' . date('Y-m-d H:i:s') . '] ' . $line . PHP_EOL);
+};
+
+/**
+ * The scheduled jobs. Each one gets a fresh container (and DB connection),
+ * so a MySQL restart between runs does not break the loop.
+ */
+$jobs = [
+  'vacancies:close-expired' => static function () use ($out): void {
+    AppContainer::reset();
+    /** @var list<VacancyDto> $closed */
+    $closed = AppContainer::systemCommandBus()->dispatch(new CloseExpiredVacanciesCommand());
+
+    $out(sprintf('vacancies:close-expired: %d vacancy(ies) closed.', count($closed)));
+    foreach ($closed as $vacancy) {
+      $out(sprintf('  - %s "%s" (deadline %s)', $vacancy->id, $vacancy->title, $vacancy->closesAtLabel));
+    }
+  },
+];
+
+/** One-off maintenance commands (not scheduled). */
+$tasks = [
+  'vacancies:reindex-search' => static function () use ($out): void {
+    $db = Database::fromEnvironment();
+    $db->beginTransaction();
+    try {
+      $count = (new VacancySearchIndexer($db))->reindexAll();
+      $db->commit();
+    } catch (Throwable $exception) {
+      $db->rollBack();
+      throw $exception;
+    }
+    $out(sprintf('vacancies:reindex-search: %d vacancy(ies) indexed.', $count));
+  },
+];
+
+switch ($command) {
+  case '':
+  case '-h':
+  case '--help':
+  case 'help':
+    fwrite(STDOUT, USAGE);
+    exit($command === '' ? 2 : 0);
+
+  case 'schedule:work':
+    $interval = (int) (getenv('SCHEDULER_INTERVAL') ?: 3600);
+    foreach (array_slice($args, 1) as $option) {
+      if (preg_match('/^--interval=(\d+)$/', $option, $m) === 1) {
+        $interval = (int) $m[1];
+      }
+    }
+    $interval = max(10, $interval);
+
+    $running = true;
+    if (function_exists('pcntl_async_signals')) {
+      pcntl_async_signals(true);
+      $stop = static function () use (&$running): void {
+        $running = false;
+      };
+      pcntl_signal(SIGTERM, $stop);
+      pcntl_signal(SIGINT, $stop);
+    }
+
+    $out(sprintf('Scheduler started: %s every %ds.', implode(', ', array_keys($jobs)), $interval));
+    while ($running) {
+      foreach ($jobs as $name => $job) {
+        try {
+          $job();
+        } catch (Throwable $exception) {
+          // Keep the loop alive: the next run retries.
+          fwrite(STDERR, sprintf('[%s] %s failed: %s' . PHP_EOL, date('Y-m-d H:i:s'), $name, $exception->getMessage()));
+        }
+      }
+
+      for ($slept = 0; $running && $slept < $interval; $slept++) {
+        sleep(1);
+      }
+    }
+    $out('Scheduler stopped.');
+    exit(0);
+
+  default:
+    $run = $jobs[$command] ?? $tasks[$command] ?? null;
+    if ($run === null) {
+      fwrite(STDERR, "Unknown command \"{$command}\".\n\n" . USAGE);
+      exit(2);
+    }
+
+    try {
+      $run();
+    } catch (Throwable $exception) {
+      fwrite(STDERR, 'ERROR: ' . $exception->getMessage() . PHP_EOL);
+      exit(1);
+    }
+    exit(0);
+}

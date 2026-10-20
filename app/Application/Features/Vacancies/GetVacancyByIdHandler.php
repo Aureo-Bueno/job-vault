@@ -51,6 +51,8 @@ final class GetVacancyByIdHandler implements QueryHandlerInterface
       ? ($this->applications->countPerVacancy()[$vacancy->id()->value()] ?? 0)
       : 0;
 
-    return VacancyDto::fromVacancy($vacancy, $company, $applicantCount);
+    $filled = $this->applications !== null ? $this->applications->approvedCountFor($vacancy->id()) : 0;
+
+    return VacancyDto::fromVacancy($vacancy, $company, $applicantCount, null, $filled);
   }
 }

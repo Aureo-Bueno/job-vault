@@ -9,6 +9,7 @@ use App\Application\Exceptions\NotFoundException;
 use App\Application\Exceptions\UnauthorizedException;
 use App\Application\Security\CurrentUserProvider;
 use App\Domain\JobApplication\AlreadyAppliedException;
+use App\Domain\JobApplication\ApplicationStatus;
 use App\Domain\JobApplication\JobApplicationRepositoryInterface;
 use App\Domain\User\UserId;
 use App\Domain\Vacancy\VacancyId;
@@ -16,7 +17,7 @@ use App\Domain\Vacancy\VacancyRepositoryInterface;
 use InvalidArgumentException;
 
 /**
- * The current user applies to an open vacancy (once).
+ * The current user applies to an open vacancy (once; again only after withdrawing).
  */
 final class ApplyToVacancyHandler implements CommandHandlerInterface
 {
@@ -49,10 +50,17 @@ final class ApplyToVacancyHandler implements CommandHandlerInterface
       throw new NotFoundException('Vaga não encontrada.');
     }
 
-    if ($this->applications->exists($candidateId, $vacancy->id())) {
+    $existing = $this->applications->findFor($candidateId, $vacancy->id());
+    if ($existing === null) {
+      $this->applications->save($vacancy->receiveApplicationFrom($candidateId));
+      return;
+    }
+
+    if ($existing->status() !== ApplicationStatus::Withdrawn) {
       throw new AlreadyAppliedException();
     }
 
-    $this->applications->save($vacancy->receiveApplicationFrom($candidateId));
+    $vacancy->acceptResubmission($existing, $candidateId);
+    $this->applications->save($existing);
   }
 }

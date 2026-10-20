@@ -9,8 +9,11 @@ use App\Application\Exceptions\MessageValidationException;
 use App\Application\Queries\Applications\ListMyAppliedVacancyIdsQuery;
 use App\Application\Queries\Profile\GetMyCandidateProfileQuery;
 use App\Application\Queries\Vacancies\ListOpenVacanciesQuery;
+use App\Domain\Shared\BrazilianState;
 use App\Domain\Shared\WorkArea;
 use App\Domain\Shared\WorkMode;
+use App\Domain\Vacancy\ContractType;
+use App\Domain\Vacancy\VacancyDeadline;
 use App\Infrastructure\Container\AppContainer;
 use App\Presentation\Support\Csrf;
 use App\Presentation\Support\HttpRedirect;
@@ -38,10 +41,23 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 $search = trim((string) ($_GET['search'] ?? ''));
 $areaFilter = trim((string) ($_GET['area'] ?? ''));
 $workModeFilter = trim((string) ($_GET['work_mode'] ?? ''));
-$sort = in_array($_GET['sort'] ?? 'match', ['match', 'recent'], true) ? (string) ($_GET['sort'] ?? 'match') : 'match';
+$salaryFilter = (int) ($_GET['min_salary'] ?? 0);
+$salaryOptions = [3000, 5000, 8000, 12000, 15000];
+$salaryFilter = in_array($salaryFilter, $salaryOptions, true) ? $salaryFilter : 0;
+$stateFilter = strtoupper(trim((string) ($_GET['state'] ?? '')));
+$contractFilter = trim((string) ($_GET['contract_type'] ?? ''));
+$sort = in_array($_GET['sort'] ?? '', ['relevance', 'match', 'recent'], true) ? (string) $_GET['sort'] : 'relevance';
 
 $profile = $queryBus->ask(new GetMyCandidateProfileQuery());
-$vacancies = $queryBus->ask(new ListOpenVacanciesQuery($search, $areaFilter, $workModeFilter, $sort));
+$vacancies = $queryBus->ask(new ListOpenVacanciesQuery(
+  $search,
+  $areaFilter,
+  $workModeFilter,
+  $sort,
+  $salaryFilter > 0 ? $salaryFilter : null,
+  $stateFilter,
+  $contractFilter
+));
 
 Layout::page('/pages/vacancies-apply-list.php', [
   'alerta' => StatusAlertMapper::fromRequest(),
@@ -53,5 +69,12 @@ Layout::page('/pages/vacancies-apply-list.php', [
   'search' => $search,
   'areaFilter' => $areaFilter,
   'workModeFilter' => $workModeFilter,
+  'contractTypes' => ContractType::options(),
+  'states' => BrazilianState::options(),
+  'salaryOptions' => $salaryOptions,
+  'salaryFilter' => $salaryFilter,
+  'stateFilter' => $stateFilter,
+  'contractFilter' => $contractFilter,
+  'today' => VacancyDeadline::today(),
   'sort' => $sort,
 ]);

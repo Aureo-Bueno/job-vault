@@ -49,7 +49,7 @@ final class SearchVacanciesHandler implements QueryHandlerInterface
 
     $filter = new VacancyFilter(
       SearchTerm::tryFrom($query->search),
-      $query->active === null ? null : VacancyStatus::fromBool($query->active),
+      $query->status === null || $query->status === '' ? null : VacancyStatus::fromString($query->status),
       $companyId,
       $area
     );
@@ -58,14 +58,15 @@ final class SearchVacanciesHandler implements QueryHandlerInterface
     $page = (new PageRequest($query->page, $query->perPage))->clampTo($total);
     $companyById = $this->loadCompanyMap();
     $applicantCounts = $this->applications !== null ? $this->applications->countPerVacancy() : [];
+    $approvedCounts = $this->applications !== null ? $this->applications->approvedPerVacancy() : [];
 
     $items = array_map(
-      static function (Vacancy $vacancy) use ($companyById, $applicantCounts): VacancyDto {
+      static function (Vacancy $vacancy) use ($companyById, $applicantCounts, $approvedCounts): VacancyDto {
         $cid = $vacancy->companyId()?->value();
         $company = $cid !== null ? ($companyById[$cid] ?? null) : null;
-        $count = $applicantCounts[$vacancy->id()->value()] ?? 0;
+        $vid = $vacancy->id()->value();
 
-        return VacancyDto::fromVacancy($vacancy, $company, $count);
+        return VacancyDto::fromVacancy($vacancy, $company, $applicantCounts[$vid] ?? 0, null, $approvedCounts[$vid] ?? 0);
       },
       $this->vacancies->matching($filter, $page)
     );

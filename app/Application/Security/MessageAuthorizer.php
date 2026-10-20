@@ -2,7 +2,10 @@
 
 namespace App\Application\Security;
 
+use App\Application\Commands\Applications\AddApplicationNoteCommand;
 use App\Application\Commands\Applications\ApplyToVacancyCommand;
+use App\Application\Commands\Applications\MoveApplicationCommand;
+use App\Application\Commands\Applications\WithdrawApplicationCommand;
 use App\Application\Commands\Companies\CreateCompanyCommand;
 use App\Application\Commands\Companies\DeleteCompanyCommand;
 use App\Application\Commands\Companies\UpdateCompanyCommand;
@@ -23,6 +26,8 @@ use App\Application\Commands\Vacancies\DeleteVacancyCommand;
 use App\Application\Commands\Vacancies\UpdateVacancyCommand;
 use App\Application\Exceptions\ForbiddenException;
 use App\Application\Exceptions\UnauthorizedException;
+use App\Application\Queries\Applications\GetVacancyPipelineQuery;
+use App\Application\Queries\Applications\ListMyApplicationsQuery;
 use App\Application\Queries\Applications\ListMyAppliedVacancyIdsQuery;
 use App\Application\Queries\Applications\ListVacancyApplicantsQuery;
 use App\Application\Queries\Companies\GetMyCompanyQuery;
@@ -45,6 +50,7 @@ use App\Application\Queries\Vacancies\SearchVacanciesQuery;
 final class MessageAuthorizer
 {
   public const ASSIGN_ROLE = 'user.assign_role';
+  public const MANAGE_APPLICATIONS = 'application.manage';
 
   /**
    * The user needs at least ONE of the listed permissions.
@@ -80,7 +86,12 @@ final class MessageAuthorizer
     GetVacancyByIdQuery::class => ['vacancy.view'],
     ApplyToVacancyCommand::class => ['vacancy.view'],
     ListMyAppliedVacancyIdsQuery::class => ['vacancy.view'],
+    ListMyApplicationsQuery::class => ['vacancy.view'],
+    WithdrawApplicationCommand::class => ['vacancy.view'],
     ListVacancyApplicantsQuery::class => ['vacancy.manage', 'vacancy.edit', 'vacancy.create'],
+    GetVacancyPipelineQuery::class => [self::MANAGE_APPLICATIONS],
+    MoveApplicationCommand::class => [self::MANAGE_APPLICATIONS],
+    AddApplicationNoteCommand::class => [self::MANAGE_APPLICATIONS],
     GetMyCandidateProfileQuery::class => ['vacancy.view'],
     SaveMyCandidateProfileCommand::class => ['vacancy.view'],
   ];

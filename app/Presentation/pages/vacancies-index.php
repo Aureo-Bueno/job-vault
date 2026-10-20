@@ -24,12 +24,12 @@ $isAdmin = PageAccess::isAdmin($user);
 $myCompany = !$isAdmin ? $queryBus->ask(new GetMyCompanyQuery()) : null;
 
 $search = trim((string) ($_GET['search'] ?? ''));
-$statusFilter = in_array($_GET['status_filter'] ?? '', ['active', 'inactive'], true) ? $_GET['status_filter'] : '';
+$statusFilter = in_array($_GET['status_filter'] ?? '', ['rascunho', 'aberta', 'encerrada'], true) ? $_GET['status_filter'] : '';
 $areaFilter = trim((string) ($_GET['area_filter'] ?? ''));
 
 $result = $queryBus->ask(new SearchVacanciesQuery(
   $search,
-  $statusFilter === '' ? null : $statusFilter === 'active',
+  $statusFilter === '' ? null : $statusFilter,
   Pagination::currentPage(),
   5,
   $areaFilter !== '' ? $areaFilter : null

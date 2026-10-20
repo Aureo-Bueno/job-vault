@@ -1,0 +1,139 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use App\Infrastructure\Persistence\Database;
+use App\Infrastructure\Persistence\Exceptions\DatabaseConnectionException;
+use App\Infrastructure\Persistence\Migrations\Migrator;
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+const USAGE = <<<'TXT'
+Usage: php bin/migrate <command> [options]
+
+Commands:
+  migrate              Apply all pending migrations (default)
+  rollback [--step=N]  Revert the last batch, or the last N migrations
+  reset                Revert every applied migration
+  fresh                reset + migrate
+  status               List migrations and their batch
+  make <name>          Create an empty migration file
+
+Environment: DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+             MIGRATE_CONNECT_RETRIES (default 30, 1s apart)
+
+TXT;
+
+$args = array_slice($argv, 1);
+$command = $args[0] ?? 'migrate';
+$out = static function (string $line): void {
+  fwrite(STDOUT, $line . PHP_EOL);
+};
+
+if (in_array($command, ['-h', '--help', 'help'], true)) {
+  fwrite(STDOUT, USAGE);
+  exit(0);
+}
+
+$path = dirname(__DIR__) . '/database/migrations';
+
+try {
+  if ($command === 'make') {
+    $name = trim(implode(' ', array_slice($args, 1)));
+    if ($name === '') {
+      throw new InvalidArgumentException('Usage: php bin/migrate make <name>');
+    }
+    $file = (new Migrator(Database::fromEnvironment(), $path))->create($name);
+    $out('Created ' . substr($file, strlen(dirname(__DIR__)) + 1));
+    exit(0);
+  }
+
+  $db = connectWithRetry($out);
+  $migrator = new Migrator($db, $path, $out);
+
+  switch ($command) {
+    case 'migrate':
+      report($out, $migrator->migrate(), 'Nothing to migrate.', 'Applied');
+      break;
+
+    case 'rollback':
+      $steps = 0;
+      foreach (array_slice($args, 1) as $option) {
+        if (preg_match('/^--step=(\d+)$/', $option, $m) === 1) {
+          $steps = (int) $m[1];
+        }
+      }
+      report($out, $migrator->rollback($steps), 'Nothing to roll back.', 'Rolled back');
+      break;
+
+    case 'reset':
+      report($out, $migrator->reset(), 'Nothing to roll back.', 'Rolled back');
+      break;
+
+    case 'fresh':
+      report($out, $migrator->reset(), 'Nothing to roll back.', 'Rolled back');
+      report($out, $migrator->migrate(), 'Nothing to migrate.', 'Applied');
+      break;
+
+    case 'status':
+      $rows = $migrator->status();
+      if ($rows === []) {
+        $out('No migrations found in database/migrations.');
+        break;
+      }
+      $width = max(array_map(static fn (array $r): int => strlen($r['migration']), $rows));
+      $out(str_pad('Migration', $width) . '  Batch  Status');
+      foreach ($rows as $row) {
+        $out(sprintf(
+          '%s  %5s  %s',
+          str_pad($row['migration'], $width),
+          $row['batch'] ?? '-',
+          $row['batch'] === null ? 'Pending' : 'Ran'
+        ));
+      }
+      break;
+
+    default:
+      fwrite(STDERR, "Unknown command \"{$command}\".\n\n" . USAGE);
+      exit(2);
+  }
+} catch (Throwable $exception) {
+  fwrite(STDERR, 'ERROR: ' . $exception->getMessage() . PHP_EOL);
+  $previous = $exception->getPrevious();
+  while ($previous !== null) {
+    fwrite(STDERR, '  caused by: ' . $previous->getMessage() . PHP_EOL);
+    $previous = $previous->getPrevious();
+  }
+  exit(1);
+}
+
+/**
+ * MySQL may still be initialising when the container starts: retry the connection.
+ */
+function connectWithRetry(callable $out): Database
+{
+  $retries = max(1, (int) (getenv('MIGRATE_CONNECT_RETRIES') ?: 30));
+
+  for ($attempt = 1; ; $attempt++) {
+    $db = Database::fromEnvironment();
+    try {
+      $db->connection();
+      return $db;
+    } catch (DatabaseConnectionException $exception) {
+      if ($attempt >= $retries) {
+        throw $exception;
+      }
+      $out(sprintf('Database not ready (attempt %d/%d), retrying in 1s...', $attempt, $retries));
+      sleep(1);
+    }
+  }
+}
+
+/**
+ * @param list<string> $names
+ */
+function report(callable $out, array $names, string $empty, string $verb): void
+{
+  $out($names === [] ? $empty : sprintf('%s %d migration(s).', $verb, count($names)));
+}

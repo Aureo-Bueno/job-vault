@@ -11,11 +11,13 @@ use App\Domain\CandidateProfile\CandidateProfileRepositoryInterface;
 use App\Domain\Company\Company;
 use App\Domain\Company\CompanyRepositoryInterface;
 use App\Domain\Matching\MatchCalculator;
+use App\Domain\Shared\BrazilianState;
 use App\Domain\Shared\PageRequest;
 use App\Domain\Shared\SearchTerm;
 use App\Domain\Shared\WorkArea;
 use App\Domain\Shared\WorkMode;
 use App\Domain\User\UserId;
+use App\Domain\Vacancy\ContractType;
 use App\Domain\Vacancy\Vacancy;
 use App\Domain\Vacancy\VacancyFilter;
 use App\Domain\Vacancy\VacancyRepositoryInterface;
@@ -51,10 +53,19 @@ final class ListOpenVacanciesHandler implements QueryHandlerInterface
       ? WorkMode::tryFrom(strtolower(trim($query->workMode)))
       : null;
 
+    $state = ($query->state !== null && trim($query->state) !== '') ? BrazilianState::fromStored($query->state) : null;
+    $contractType = ($query->contractType !== null && trim($query->contractType) !== '')
+      ? ContractType::tryFrom(strtolower(trim($query->contractType)))
+      : null;
+
+    $text = SearchTerm::tryFrom($query->search);
     $filter = VacancyFilter::openOnly(
-      SearchTerm::tryFrom($query->search),
+      $text,
       $area,
-      $workMode
+      $workMode,
+      $query->minSalary !== null && $query->minSalary > 0 ? $query->minSalary : null,
+      $state,
+      $contractType
     );
 
     $vacancies = $this->vacancies->matching($filter, PageRequest::all());
@@ -76,12 +87,16 @@ final class ListOpenVacanciesHandler implements QueryHandlerInterface
       $vacancies
     );
 
-    if ($query->sort === 'match' && $candidateProfile !== null) {
+    // The repository returns the most relevant first when there is a text search, newest first otherwise.
+    $sort = $query->sort === 'relevance' && $text === null ? 'match' : $query->sort;
+    if ($sort === 'match' && $candidateProfile !== null) {
       usort(
         $items,
         static fn (VacancyDto $a, VacancyDto $b): int => ($b->matchScore ?? 0) <=> ($a->matchScore ?? 0)
           ?: strcmp($b->createdAt, $a->createdAt)
       );
+    } elseif ($sort === 'recent') {
+      usort($items, static fn (VacancyDto $a, VacancyDto $b): int => strcmp($b->createdAt, $a->createdAt));
     }
 
     return $items;

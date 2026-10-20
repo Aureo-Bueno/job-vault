@@ -3,6 +3,7 @@
 namespace App\Presentation\Support;
 
 use App\Application\Abstractions\HandlerNotFoundException;
+use App\Application\Exceptions\ConflictException;
 use App\Application\Exceptions\ForbiddenException;
 use App\Application\Exceptions\MessageValidationException;
 use App\Application\Exceptions\NotFoundException;
@@ -33,7 +34,8 @@ final class ExceptionHttpMapper
         self::payload(401, 'unauthorized', self::messageOrDefault($exception, 'Você precisa entrar para continuar.')),
       $exception instanceof ForbiddenException =>
         self::payload(403, 'forbidden', self::messageOrDefault($exception, 'Você não tem permissão para executar esta ação.')),
-      $exception instanceof AlreadyExistsException =>
+      $exception instanceof AlreadyExistsException,
+      $exception instanceof ConflictException =>
         self::payload(409, 'conflict', self::messageOrDefault($exception, 'O registro informado já existe.')),
       $exception instanceof InvalidValueException,
       $exception instanceof BusinessRuleViolationException,

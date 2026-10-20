@@ -8,7 +8,9 @@ use App\Application\Commands\Vacancies\UpdateVacancyCommand;
 use App\Domain\Shared\Seniority;
 use App\Domain\Shared\WorkArea;
 use App\Domain\Shared\WorkMode;
+use App\Domain\Vacancy\VacancyDeadline;
 use App\Domain\Vacancy\VacancyDescription;
+use App\Domain\Vacancy\VacancyPositions;
 use App\Domain\Vacancy\VacancyRepositoryInterface;
 use App\Domain\Vacancy\VacancyStatus;
 use App\Domain\Vacancy\VacancyTitle;
@@ -43,9 +45,26 @@ final class UpdateVacancyHandler implements CommandHandlerInterface
       $command->area !== null ? WorkArea::fromString($command->area) : null,
       $command->seniority !== null ? Seniority::fromString($command->seniority) : null,
       $command->workMode !== null ? WorkMode::fromString($command->workMode) : null,
-      $command->topics
+      $command->topics,
+      $command->positions !== null ? VacancyPositions::fromInt($command->positions) : null,
+      $command->contractType !== null
+        ? EmploymentTermsInput::toTerms(
+          $command->contractType,
+          $command->salaryMin,
+          $command->salaryMax,
+          $command->city,
+          $command->state,
+          $command->benefits
+        )
+        : null
     );
-    $vacancy->changeStatus(VacancyStatus::fromBool($command->active));
+    if ($command->closesAt !== null) {
+      $vacancy->reschedule(VacancyDeadline::fromInput($command->closesAt));
+    }
+    // Last: reopening checks the (possibly new) deadline.
+    if ($command->status !== null) {
+      $vacancy->changeStatus(VacancyStatus::fromString($command->status));
+    }
 
     if ($command->changeCompany && $scope->isAdmin()) {
       $vacancy->assignCompany($scope->resolveAssignedCompany($command->companyId));

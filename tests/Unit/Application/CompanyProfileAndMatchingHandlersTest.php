@@ -143,10 +143,10 @@ final class CompanyProfileAndMatchingHandlersTest extends TestCase
     );
 
     $vacancyA = (new CreateVacancyHandler($this->vacancies, $scopeA, $this->companies))->handle(
-      new CreateVacancyCommand('Vaga A', 'Desc A', true, 'backend', 'pleno', 'remoto', ['PHP', 'MySQL'])
+      new CreateVacancyCommand('Vaga A', 'Desc A', 'aberta', 'backend', 'pleno', 'remoto', ['PHP', 'MySQL'])
     );
     $vacancyB = (new CreateVacancyHandler($this->vacancies, $scopeB, $this->companies))->handle(
-      new CreateVacancyCommand('Vaga B', 'Desc B', true, 'frontend', 'senior', 'hibrido', ['React'])
+      new CreateVacancyCommand('Vaga B', 'Desc B', 'aberta', 'frontend', 'senior', 'hibrido', ['React'], city: 'Recife', state: 'PE')
     );
 
     $this->assertSame('Empresa A', $vacancyA->companyName);
@@ -202,10 +202,10 @@ final class CompanyProfileAndMatchingHandlersTest extends TestCase
     $createVacancy = new CreateVacancyHandler($this->vacancies, $scopeRecruiter, $this->companies);
 
     $lowVacancy = $createVacancy->handle(
-      new CreateVacancyCommand('Vaga Mobile Flutter', 'App mobile', true, 'mobile', 'junior', 'presencial', ['Flutter', 'Dart'])
+      new CreateVacancyCommand('Vaga Mobile Flutter', 'App mobile', 'aberta', 'mobile', 'junior', 'presencial', ['Flutter', 'Dart'], city: 'Recife', state: 'PE')
     );
     $highVacancy = $createVacancy->handle(
-      new CreateVacancyCommand('Vaga Backend PHP', 'APIs e DDD', true, 'backend', 'pleno', 'remoto', ['PHP', 'MySQL', 'DDD'])
+      new CreateVacancyCommand('Vaga Backend PHP', 'APIs e DDD', 'aberta', 'backend', 'pleno', 'remoto', ['PHP', 'MySQL', 'DDD'])
     );
 
     $openForAlice = (new ListOpenVacanciesHandler($this->vacancies, $this->companies, $this->profiles, $aliceCurrent))

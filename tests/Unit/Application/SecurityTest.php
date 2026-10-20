@@ -2,12 +2,17 @@
 
 namespace Tests\Unit\Application;
 
+use App\Application\Commands\Applications\AddApplicationNoteCommand;
+use App\Application\Commands\Applications\MoveApplicationCommand;
+use App\Application\Commands\Applications\WithdrawApplicationCommand;
 use App\Application\Commands\Users\CreateUserCommand;
 use App\Application\Commands\Users\DeleteUserCommand;
 use App\Application\Commands\Users\UpdateUserCommand;
 use App\Application\Commands\Vacancies\CreateVacancyCommand;
 use App\Application\Exceptions\ForbiddenException;
 use App\Application\Exceptions\UnauthorizedException;
+use App\Application\Queries\Applications\GetVacancyPipelineQuery;
+use App\Application\Queries\Applications\ListMyApplicationsQuery;
 use App\Application\Queries\Applications\ListMyAppliedVacancyIdsQuery;
 use App\Application\Security\MessageAuthorizer;
 use App\Application\Security\RoleBasedAuthorization;
@@ -81,6 +86,22 @@ final class SecurityTest extends TestCase
     $this->expectExceptionMessage('user.delete');
     (new MessageAuthorizer(FakeCurrentUser::as('1'), new FakeAuthorization(['user.list'])))
       ->authorize(new DeleteUserCommand('2'));
+  }
+
+  public function testPipelineMessagesRequireApplicationManage(): void
+  {
+    $candidate = new MessageAuthorizer(FakeCurrentUser::as('1'), new FakeAuthorization(['vacancy.view'], false));
+    $candidate->authorize(new ListMyApplicationsQuery());
+    $candidate->authorize(new WithdrawApplicationCommand('a'));
+
+    $recruiter = new MessageAuthorizer(FakeCurrentUser::as('2'), new FakeAuthorization([MessageAuthorizer::MANAGE_APPLICATIONS], false));
+    $recruiter->authorize(new MoveApplicationCommand('a', MoveApplicationCommand::ADVANCE));
+    $recruiter->authorize(new AddApplicationNoteCommand('a', 'nota'));
+    $recruiter->authorize(new GetVacancyPipelineQuery('v'));
+
+    $this->expectException(ForbiddenException::class);
+    $this->expectExceptionMessage(MessageAuthorizer::MANAGE_APPLICATIONS);
+    $candidate->authorize(new MoveApplicationCommand('a', MoveApplicationCommand::ADVANCE));
   }
 
   public function testAuthorizerEnforcesAdminOnlyMessages(): void

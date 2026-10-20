@@ -41,7 +41,7 @@ final class VacancyTest extends TestCase
     $vacancy = $this->vacancy();
 
     $vacancy->revise(VacancyTitle::fromString('Dev Go'), VacancyDescription::fromString('Backend'));
-    $vacancy->changeStatus(VacancyStatus::Inactive);
+    $vacancy->changeStatus(VacancyStatus::Closed);
 
     $this->assertSame('Dev Go', $vacancy->title()->value());
     $this->assertSame('Backend', $vacancy->description()->value());

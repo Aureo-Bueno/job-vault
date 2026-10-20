@@ -25,10 +25,13 @@ $summary = $total === 1 ? '1 vaga' : $total . ' vagas';
   <div>
     <p class="jv-eyebrow"><?= !empty($myCompany) ? htmlspecialchars($myCompany->name) : 'Vagas' ?></p>
     <h1 class="jv-title">Painel de vagas</h1>
-    <p class="jv-subtitle">
+    <p class="jv-subtitle" id="panel-summary" data-live-region aria-live="polite">
       <?= htmlspecialchars($hasFilters ? $summary . ' encontradas com os filtros atuais' : $summary . ' cadastradas') ?>
       <?php if (!empty($myCompany)) : ?>
         · vinculadas à sua empresa
+      <?php endif; ?>
+      <?php if ($search !== '' && $total > 1) : ?>
+        · mais relevantes primeiro
       <?php endif; ?>
     </p>
   </div>
@@ -44,12 +47,12 @@ $summary = $total === 1 ? '1 vaga' : $total . ' vagas';
 <?php View::partial('alert', ['alerta' => $alerta]); ?>
 
 <section class="jv-panel">
-  <form method="GET" class="jv-toolbar" role="search">
+  <form method="GET" class="jv-toolbar" role="search" data-live-search>
     <input type="hidden" name="r" value="vacancies">
     <label class="jv-search mb-0">
-      <span class="visually-hidden">Buscar por título ou tópico</span>
+      <span class="visually-hidden">Buscar em título, descrição, tópicos e benefícios</span>
       <i class="bi bi-search" aria-hidden="true"></i>
-      <input type="search" name="search" class="form-control" placeholder="Buscar por título ou tópico (ex.: PHP, React)" value="<?= htmlspecialchars($search) ?>" autocomplete="off">
+      <input type="search" name="search" class="form-control" placeholder="Buscar em título, descrição, tópicos e benefícios" value="<?= htmlspecialchars($search) ?>" autocomplete="off" data-live-search-input>
     </label>
     <label class="visually-hidden" for="area_filter">Área</label>
     <select name="area_filter" id="area_filter" class="form-select">
@@ -61,15 +64,19 @@ $summary = $total === 1 ? '1 vaga' : $total . ' vagas';
     <label class="visually-hidden" for="status_filter">Status</label>
     <select name="status_filter" id="status_filter" class="form-select">
       <option value="">Todos os status</option>
-      <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Ativas</option>
-      <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Inativas</option>
+      <option value="aberta" <?= $statusFilter === 'aberta' ? 'selected' : '' ?>>Abertas</option>
+      <option value="rascunho" <?= $statusFilter === 'rascunho' ? 'selected' : '' ?>>Rascunhos</option>
+      <option value="encerrada" <?= $statusFilter === 'encerrada' ? 'selected' : '' ?>>Encerradas</option>
     </select>
     <button type="submit" class="btn btn-ghost"><i class="bi bi-funnel"></i> Filtrar</button>
-    <?php if ($hasFilters) : ?>
-      <a href="index.php?r=vacancies" class="btn btn-link text-muted px-2">Limpar</a>
-    <?php endif; ?>
+    <span id="panel-clear" data-live-region>
+      <?php if ($hasFilters) : ?>
+        <a href="index.php?r=vacancies" class="btn btn-link text-muted px-2">Limpar</a>
+      <?php endif; ?>
+    </span>
   </form>
 
+  <div id="panel-results" data-live-region>
   <?php if (empty($vacancies)) : ?>
     <div class="jv-empty">
       <i class="bi bi-briefcase" aria-hidden="true"></i>
@@ -95,9 +102,11 @@ $summary = $total === 1 ? '1 vaga' : $total . ' vagas';
           <?php foreach ($vacancies as $vacancy) : ?>
             <?php
             $vacancyId = urlencode($vacancy->id);
-            $published = $vacancy->createdAt !== '' ? date('d/m/Y', strtotime($vacancy->createdAt)) : '—';
+            $published = $vacancy->isDraft()
+              ? 'não publicada'
+              : ($vacancy->createdAt !== '' ? date('d/m/Y', strtotime($vacancy->createdAt)) : '—');
             ?>
-            <tr class="jv-rail <?= $vacancy->isActive ? 'jv-rail--active' : 'jv-rail--inactive' ?>">
+            <tr class="jv-rail <?= $vacancy->isActive ? 'jv-rail--active' : ($vacancy->isDraft() ? 'jv-rail--draft' : 'jv-rail--inactive') ?>">
               <td data-label="">
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                   <span class="jv-cell-title mb-0"><?= htmlspecialchars($vacancy->title) ?></span>
@@ -117,21 +126,36 @@ $summary = $total === 1 ? '1 vaga' : $total . ' vagas';
               <td data-label="Perfil" class="text-nowrap">
                 <div class="d-flex flex-column gap-1 align-items-start">
                   <span class="jv-badge"><?= htmlspecialchars($vacancy->areaLabel) ?></span>
-                  <span class="text-muted small"><?= htmlspecialchars($vacancy->seniorityLabel) ?> · <?= htmlspecialchars($vacancy->workModeLabel) ?></span>
+                  <span class="text-muted small"><?= htmlspecialchars($vacancy->seniorityLabel) ?> · <?= htmlspecialchars($vacancy->workModeLabel) ?><?= $vacancy->locationLabel !== '' ? ' · ' . htmlspecialchars($vacancy->locationLabel) : '' ?></span>
+                  <span class="small"><?= htmlspecialchars($vacancy->contractTypeLabel) ?> · <span class="jv-mono <?= $vacancy->isSalaryNegotiable() ? 'text-muted' : '' ?>"><?= htmlspecialchars($vacancy->salaryLabel) ?></span></span>
                 </div>
               </td>
               <td data-label="Candidatos" class="text-nowrap">
-                <a href="index.php?r=vacancies/applicants&amp;id=<?= $vacancyId ?>" class="btn btn-ghost btn-sm">
-                  <i class="bi bi-people"></i>
+                <a href="index.php?r=vacancies/applicants&amp;id=<?= $vacancyId ?>" class="btn btn-ghost btn-sm" title="Abrir pipeline de candidaturas">
+                  <i class="bi bi-kanban"></i>
                   <?= (int) $vacancy->applicantCount ?> <?= $vacancy->applicantCount === 1 ? 'inscrito' : 'inscritos' ?>
                 </a>
-              </td>
-              <td data-label="Status">
-                <span class="jv-status <?= $vacancy->isActive ? 'jv-status--active' : 'jv-status--inactive' ?>">
-                  <?= $vacancy->isActive ? 'Ativa' : 'Inativa' ?>
+                <span class="d-block jv-mono text-muted small mt-1" title="Aprovados / posições">
+                  <?= (int) $vacancy->filledPositions ?>/<?= (int) $vacancy->positions ?> <?= $vacancy->positions === 1 ? 'posição preenchida' : 'posições preenchidas' ?>
                 </span>
               </td>
-              <td data-label="Publicada em" class="text-nowrap"><span class="jv-mono text-muted"><?= htmlspecialchars($published) ?></span></td>
+              <td data-label="Status">
+                <span class="jv-status <?= $vacancy->isActive ? 'jv-status--active' : ($vacancy->isDraft() ? 'jv-status--draft' : 'jv-status--inactive') ?>"<?= $vacancy->closeReasonLabel !== '' ? ' title="' . htmlspecialchars($vacancy->closeReasonLabel) . '"' : '' ?>>
+                  <?= htmlspecialchars($vacancy->statusLabel) ?>
+                </span>
+                <?php if ($vacancy->closeReasonLabel !== '') : ?>
+                  <span class="d-block text-muted small mt-1"><?= htmlspecialchars($vacancy->closeReasonLabel) ?></span>
+                <?php endif; ?>
+              </td>
+              <td data-label="Publicada em" class="text-nowrap">
+                <span class="jv-mono text-muted"><?= htmlspecialchars($published) ?></span>
+                <?php if ($vacancy->hasDeadline()) : ?>
+                  <span class="d-block small mt-1 <?= $vacancy->isActive && !$vacancy->acceptsApplications ? 'text-warning' : 'text-muted' ?>" title="Prazo de inscrição">
+                    <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                    <?= $vacancy->isActive && !$vacancy->acceptsApplications ? 'Prazo vencido em ' : 'até ' ?><span class="jv-mono"><?= htmlspecialchars($vacancy->closesAtLabel) ?></span>
+                  </span>
+                <?php endif; ?>
+              </td>
               <?php if ($canEdit || $canDelete) : ?>
                 <td data-label="">
                   <div class="jv-actions">
@@ -161,4 +185,5 @@ $summary = $total === 1 ? '1 vaga' : $total . ' vagas';
       'summary' => $summary,
     ]); ?>
   <?php endif; ?>
+  </div>
 </section>

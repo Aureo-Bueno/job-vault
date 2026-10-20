@@ -10,9 +10,14 @@ use App\Application\Auth\AuthService;
 use App\Application\Behaviors\AuthorizationBehavior;
 use App\Application\Behaviors\LoggingBehavior;
 use App\Application\Behaviors\TransactionBehavior;
+use App\Application\Features\Applications\AddApplicationNoteHandler;
 use App\Application\Features\Applications\ApplyToVacancyHandler;
+use App\Application\Features\Applications\GetVacancyPipelineHandler;
+use App\Application\Features\Applications\ListMyApplicationsHandler;
 use App\Application\Features\Applications\ListMyAppliedVacancyIdsHandler;
 use App\Application\Features\Applications\ListVacancyApplicantsHandler;
+use App\Application\Features\Applications\MoveApplicationHandler;
+use App\Application\Features\Applications\WithdrawApplicationHandler;
 use App\Application\Features\Companies\CreateCompanyHandler;
 use App\Application\Features\Companies\DeleteCompanyHandler;
 use App\Application\Features\Companies\GetMyCompanyHandler;
@@ -35,6 +40,7 @@ use App\Application\Features\Users\DeleteUserHandler;
 use App\Application\Features\Users\GetUserByIdHandler;
 use App\Application\Features\Users\SearchUsersHandler;
 use App\Application\Features\Users\UpdateUserHandler;
+use App\Application\Features\Vacancies\CloseExpiredVacanciesHandler;
 use App\Application\Features\Vacancies\CreateVacancyHandler;
 use App\Application\Features\Vacancies\DeleteVacancyHandler;
 use App\Application\Features\Vacancies\GetVacancyByIdHandler;
@@ -140,6 +146,7 @@ final class AppContainer
       $authorization = self::authorization();
       $registrar = self::userRegistrar();
       $vacancyScope = self::vacancyAccessScope();
+      $applications = self::jobApplicationRepository();
       $database = self::database();
 
       return new SimpleCommandBus(
@@ -162,7 +169,10 @@ final class AppContainer
           new CreateVacancyHandler($vacancies, $vacancyScope, $companies),
           new UpdateVacancyHandler($vacancies, $vacancyScope),
           new DeleteVacancyHandler($vacancies, $vacancyScope),
-          new ApplyToVacancyHandler($vacancies, self::jobApplicationRepository(), $currentUser),
+          new ApplyToVacancyHandler($vacancies, $applications, $currentUser),
+          new WithdrawApplicationHandler($applications, $currentUser),
+          new MoveApplicationHandler($applications, $vacancies, $vacancyScope, $currentUser),
+          new AddApplicationNoteHandler($applications, $vacancies, $vacancyScope, $currentUser),
         ],
         [
           new AuthorizationBehavior([self::messageAuthorizer(), 'authorize']),
@@ -172,6 +182,31 @@ final class AppContainer
             [$database, 'rollBack']
           ),
           new LoggingBehavior(self::logger('pipeline')),
+        ]
+      );
+    });
+  }
+
+  /**
+   * Bus for scheduled/system jobs (bin/console): no logged-in user, so no authorization step.
+   * Never expose it to HTTP requests.
+   */
+  public static function systemCommandBus(): CommandBusInterface
+  {
+    return self::shared('systemCommandBus', static function (): CommandBusInterface {
+      $database = self::database();
+
+      return new SimpleCommandBus(
+        [
+          new CloseExpiredVacanciesHandler(self::vacancyRepository()),
+        ],
+        [
+          new TransactionBehavior(
+            [$database, 'beginTransaction'],
+            [$database, 'commit'],
+            [$database, 'rollBack']
+          ),
+          new LoggingBehavior(self::logger('scheduler')),
         ]
       );
     });
@@ -188,6 +223,7 @@ final class AppContainer
       $currentUser = self::authService();
       $vacancyScope = self::vacancyAccessScope();
       $calculator = new MatchCalculator();
+      $applicants = new ListVacancyApplicantsHandler($vacancies, $applications, $users, $profiles, $vacancyScope, $calculator);
 
       return new SimpleQueryBus(
         [
@@ -202,7 +238,9 @@ final class AppContainer
           new ListOpenVacanciesHandler($vacancies, $companies, $profiles, $currentUser, $calculator),
           new GetVacancyByIdHandler($vacancies, $vacancyScope, $companies, $applications),
           new ListMyAppliedVacancyIdsHandler($applications, $currentUser),
-          new ListVacancyApplicantsHandler($vacancies, $applications, $users, $profiles, $vacancyScope, $calculator),
+          $applicants,
+          new GetVacancyPipelineHandler($applicants),
+          new ListMyApplicationsHandler($applications, $vacancies, $companies, $currentUser),
         ],
         [
           new AuthorizationBehavior([self::messageAuthorizer(), 'authorize']),

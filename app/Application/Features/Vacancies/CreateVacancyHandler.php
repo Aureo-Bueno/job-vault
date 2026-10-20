@@ -11,8 +11,10 @@ use App\Domain\Shared\Seniority;
 use App\Domain\Shared\WorkArea;
 use App\Domain\Shared\WorkMode;
 use App\Domain\Vacancy\Vacancy;
+use App\Domain\Vacancy\VacancyDeadline;
 use App\Domain\Vacancy\VacancyDescription;
 use App\Domain\Vacancy\VacancyId;
+use App\Domain\Vacancy\VacancyPositions;
 use App\Domain\Vacancy\VacancyRepositoryInterface;
 use App\Domain\Vacancy\VacancyStatus;
 use App\Domain\Vacancy\VacancyTitle;
@@ -45,13 +47,23 @@ final class CreateVacancyHandler implements CommandHandlerInterface
       VacancyId::generate(),
       VacancyTitle::fromString($command->title),
       VacancyDescription::fromString($command->description),
-      VacancyStatus::fromBool($command->active),
+      VacancyStatus::fromString($command->status),
       null,
       $companyId,
       WorkArea::fromString($command->area),
       Seniority::fromString($command->seniority),
       WorkMode::fromString($command->workMode),
-      $command->topics
+      $command->topics,
+      VacancyPositions::fromInt($command->positions),
+      EmploymentTermsInput::toTerms(
+        $command->contractType,
+        $command->salaryMin,
+        $command->salaryMax,
+        $command->city,
+        $command->state,
+        $command->benefits
+      ),
+      VacancyDeadline::fromInput($command->closesAt)
     );
     $this->vacancies->save($vacancy);
 

@@ -42,13 +42,15 @@ final class VacancyHandlersTest extends TestCase
   {
     $created = $this->create('Dev PHP');
     $this->assertTrue($created->isActive);
+    $this->assertSame('aberta', $created->status);
 
     (new UpdateVacancyHandler($this->vacancies))->handle(
-      new UpdateVacancyCommand($created->id, 'Dev PHP Sr', 'Nova descrição', false)
+      new UpdateVacancyCommand($created->id, 'Dev PHP Sr', 'Nova descrição', 'encerrada', positions: 3)
     );
     $stored = $this->vacancies->get(VacancyId::fromString($created->id));
     $this->assertSame('Dev PHP Sr', $stored?->title()->value());
     $this->assertFalse($stored?->isOpen());
+    $this->assertSame(3, $stored?->positions()->value());
 
     (new DeleteVacancyHandler($this->vacancies))->handle(new DeleteVacancyCommand($created->id));
     $this->assertNull($this->vacancies->get(VacancyId::fromString($created->id)));
@@ -69,13 +71,15 @@ final class VacancyHandlersTest extends TestCase
   public function testSearchFiltersByTitleAndStatus(): void
   {
     $this->create('Dev PHP');
-    $this->create('Dev Java', false);
+    $this->create('Dev Java', 'encerrada');
+    $this->create('Dev Go', 'rascunho');
     $this->create('Analista');
 
     $search = new SearchVacanciesHandler($this->vacancies);
-    $this->assertSame(2, $search->handle(new SearchVacanciesQuery('dev'))->total);
-    $this->assertSame(1, $search->handle(new SearchVacanciesQuery('dev', true))->total);
-    $this->assertSame(1, $search->handle(new SearchVacanciesQuery(null, false))->total);
+    $this->assertSame(3, $search->handle(new SearchVacanciesQuery('dev'))->total);
+    $this->assertSame(1, $search->handle(new SearchVacanciesQuery('dev', 'aberta'))->total);
+    $this->assertSame(1, $search->handle(new SearchVacanciesQuery(null, 'encerrada'))->total);
+    $this->assertSame(1, $search->handle(new SearchVacanciesQuery(null, 'rascunho'))->total);
 
     $open = (new ListOpenVacanciesHandler($this->vacancies))->handle(new ListOpenVacanciesQuery());
     $this->assertCount(2, $open);
@@ -99,7 +103,7 @@ final class VacancyHandlersTest extends TestCase
 
   public function testCannotApplyToClosedVacancy(): void
   {
-    $vacancy = $this->create('Dev PHP', false);
+    $vacancy = $this->create('Dev PHP', 'encerrada');
 
     $this->expectException(VacancyNotOpenException::class);
     (new ApplyToVacancyHandler($this->vacancies, $this->applications, FakeCurrentUser::as('7')))
@@ -115,8 +119,23 @@ final class VacancyHandlersTest extends TestCase
       ->handle(new ApplyToVacancyCommand($vacancy->id));
   }
 
-  private function create(string $title, bool $active = true): \App\Application\DTOs\VacancyDto
+  public function testCannotApplyToDraftVacancy(): void
   {
-    return (new CreateVacancyHandler($this->vacancies))->handle(new CreateVacancyCommand($title, 'Descrição', $active));
+    $vacancy = $this->create('Dev PHP', 'rascunho');
+
+    $this->expectException(VacancyNotOpenException::class);
+    (new ApplyToVacancyHandler($this->vacancies, $this->applications, FakeCurrentUser::as('7')))
+      ->handle(new ApplyToVacancyCommand($vacancy->id));
+  }
+
+  public function testInvalidStatusIsRejected(): void
+  {
+    $this->expectException(InvalidValueException::class);
+    $this->create('Dev PHP', 'ativa');
+  }
+
+  private function create(string $title, string $status = 'aberta'): \App\Application\DTOs\VacancyDto
+  {
+    return (new CreateVacancyHandler($this->vacancies))->handle(new CreateVacancyCommand($title, 'Descrição', $status));
   }
 }

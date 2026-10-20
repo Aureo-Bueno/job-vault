@@ -11,7 +11,7 @@ final class SearchVacanciesQuery implements Query
 {
   public function __construct(
     public readonly ?string $search = null,
-    public readonly ?bool $active = null,
+    public readonly ?string $status = null,
     public readonly int $page = 1,
     public readonly int $perPage = 10,
     public readonly ?string $area = null,

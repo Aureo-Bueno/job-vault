@@ -1,6 +1,12 @@
 (function () {
   'use strict';
 
+  // Bootstrap modals must live under <body>: the animated content wrapper creates a
+  // stacking context that would otherwise put the modal behind its backdrop.
+  document.querySelectorAll('.jv-content .modal').forEach(function (modal) {
+    document.body.appendChild(modal);
+  });
+
   // Show/hide password: <button data-toggle-password="#input-id">
   document.querySelectorAll('[data-toggle-password]').forEach(function (button) {
     button.addEventListener('click', function () {
@@ -65,7 +71,7 @@
       if (topics.length === 0) {
         var empty = document.createElement('span');
         empty.className = 'text-muted small py-1';
-        empty.textContent = 'Nenhum tópico adicionado ainda.';
+        empty.textContent = picker.getAttribute('data-topic-empty') || 'Nenhum tópico adicionado ainda.';
         listEl.appendChild(empty);
       } else {
         topics.forEach(function (topic) {
@@ -173,6 +179,32 @@
     render();
   });
 
+  // Vacancy form: city/UF are required for on-site and hybrid vacancies.
+  var workModeSelect = document.querySelector('[data-work-mode]');
+  var locationFields = document.querySelector('[data-location-fields]');
+  if (workModeSelect && locationFields) {
+    var locationHint = document.querySelector('[data-location-hint]');
+    var optionalTag = locationFields.querySelector('[data-location-optional]');
+    var syncLocation = function () {
+      var required = workModeSelect.value !== 'remoto';
+      locationFields.querySelectorAll('input, select').forEach(function (field) {
+        field.required = required;
+        if (!required) {
+          field.classList.remove('is-invalid');
+        }
+      });
+      if (optionalTag) {
+        optionalTag.hidden = required;
+      }
+      if (locationHint) {
+        locationHint.textContent = required
+          ? 'Obrigatório para vagas presenciais e híbridas.'
+          : 'Em vagas remotas, informe se quiser indicar a sede do time.';
+      }
+    };
+    workModeSelect.addEventListener('change', syncLocation);
+  }
+
   // Client-side validation only highlights errors (red). Fields are never painted green:
   // a valid format does not mean the server accepted the data (e.g. wrong password).
   var markField = function (field) {
@@ -210,6 +242,80 @@
           markField(field);
         }
       });
+    });
+  });
+
+  // Search as you type: <form data-live-search> with an <input data-live-search-input>.
+  // Fetches the same page with the form's query and swaps every [data-live-region][id]
+  // (results, counters, "Limpar"), so the input keeps focus and caret. Waits 400 ms after the
+  // last key and for at least 2 characters (or an empty box). Enter/Filtrar still submit normally,
+  // and any failure (network, expired session) falls back to a regular submit.
+  document.querySelectorAll('form[data-live-search]').forEach(function (form) {
+    var input = form.querySelector('[data-live-search-input]');
+    if (!input || !window.fetch || !window.DOMParser || !window.AbortController) {
+      return;
+    }
+
+    var timer = null;
+    var controller = null;
+    var lastValue = input.value.trim();
+    var liveRegions = function () {
+      return document.querySelectorAll('[data-live-region][id]');
+    };
+
+    var search = function () {
+      var url = new URL(window.location.pathname, window.location.href);
+      url.search = new URLSearchParams(new FormData(form)).toString();
+
+      if (controller) {
+        controller.abort();
+      }
+      controller = new AbortController();
+      liveRegions().forEach(function (region) { region.classList.add('is-loading'); });
+
+      fetch(url.toString(), { signal: controller.signal, credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+        .then(function (response) {
+          if (!response.ok || response.redirected) {
+            throw new Error('live search unavailable');
+          }
+          return response.text();
+        })
+        .then(function (html) {
+          var fresh = new DOMParser().parseFromString(html, 'text/html');
+          liveRegions().forEach(function (region) {
+            var replacement = fresh.getElementById(region.id);
+            if (replacement) {
+              region.replaceWith(document.importNode(replacement, true));
+            } else {
+              region.classList.remove('is-loading');
+            }
+          });
+          window.history.replaceState(null, '', url.toString());
+        })
+        .catch(function (error) {
+          if (error.name !== 'AbortError') {
+            form.submit();
+          }
+        });
+    };
+
+    input.addEventListener('input', function () {
+      var value = input.value.trim();
+      clearTimeout(timer);
+      if (value === lastValue || value.length === 1) {
+        return;
+      }
+      timer = setTimeout(function () {
+        lastValue = value;
+        search();
+      }, 400);
+    });
+
+    form.addEventListener('submit', function () {
+      clearTimeout(timer);
+      if (controller) {
+        controller.abort();
+      }
     });
   });
 

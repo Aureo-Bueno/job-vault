@@ -3,7 +3,7 @@
 namespace App\Application\DTOs;
 
 /**
- * Candidate application enriched with profile details and vacancy match score.
+ * Candidate application enriched with profile details, vacancy match score and pipeline state.
  */
 final class VacancyApplicantDto
 {
@@ -11,6 +11,8 @@ final class VacancyApplicantDto
    * @param list<string> $topics
    * @param list<string> $matchedTopics
    * @param list<string> $missingTopics
+   * @param list<ApplicationEventDto> $history oldest first
+   * @param list<ApplicationNoteDto> $notes oldest first
    */
   public function __construct(
     public readonly string $applicationId,
@@ -30,7 +32,21 @@ final class VacancyApplicantDto
     public readonly int $matchScore,
     public readonly string $matchLevel,
     public readonly array $matchedTopics,
-    public readonly array $missingTopics
+    public readonly array $missingTopics,
+    public readonly string $status = 'recebida',
+    public readonly string $statusLabel = 'Recebida',
+    public readonly string $statusChangedAt = '',
+    public readonly string $candidateFeedback = '',
+    public readonly ?string $nextStatusLabel = null,
+    public readonly bool $canReject = false,
+    public readonly bool $canReopen = false,
+    public readonly array $history = [],
+    public readonly array $notes = []
   ) {
+  }
+
+  public function canAdvance(): bool
+  {
+    return $this->nextStatusLabel !== null;
   }
 }

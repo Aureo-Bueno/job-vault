@@ -70,7 +70,7 @@ final class MatchingAndProfileTest extends TestCase
       VacancyId::generate(),
       VacancyTitle::fromString('Dev Backend PHP'),
       VacancyDescription::fromString('API REST e DDD'),
-      VacancyStatus::Active,
+      VacancyStatus::Open,
       null,
       CompanyId::generate(),
       WorkArea::Backend,

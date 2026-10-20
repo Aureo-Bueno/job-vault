@@ -77,6 +77,9 @@ $showShell = $loggedUser !== null;
                   <a class="jv-nav-link <?= $isActive('vacancies/apply') ?>" href="index.php?r=vacancies/apply">
                     <i class="bi bi-send"></i> Vagas abertas
                   </a>
+                  <a class="jv-nav-link <?= $isActive('applications') ?>" href="index.php?r=applications">
+                    <i class="bi bi-kanban"></i> Minhas candidaturas
+                  </a>
                   <a class="jv-nav-link <?= $isActive('profile') ?>" href="index.php?r=profile">
                     <i class="bi bi-person-badge"></i>
                     <span class="flex-grow-1">Meu perfil</span>

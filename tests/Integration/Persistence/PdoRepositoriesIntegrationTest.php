@@ -6,6 +6,8 @@ use App\Domain\CandidateProfile\CandidateProfile;
 use App\Domain\Company\Company;
 use App\Domain\Company\CompanyId;
 use App\Domain\Company\CompanyName;
+use App\Domain\JobApplication\ApplicationNote;
+use App\Domain\JobApplication\ApplicationStatus;
 use App\Domain\Permission\Permission;
 use App\Domain\Permission\PermissionId;
 use App\Domain\Role\Role;
@@ -22,10 +24,18 @@ use App\Domain\User\PlainPassword;
 use App\Domain\User\User;
 use App\Domain\User\UserFilter;
 use App\Domain\User\UserId;
+use App\Domain\Shared\BrazilianState;
+use App\Domain\Vacancy\ContractType;
+use App\Domain\Vacancy\EmploymentTerms;
+use App\Domain\Vacancy\SalaryRange;
 use App\Domain\Vacancy\Vacancy;
+use App\Domain\Vacancy\VacancyDeadline;
+use App\Domain\Vacancy\VacancyLocation;
+use App\Domain\Vacancy\VacancyCloseReason;
 use App\Domain\Vacancy\VacancyDescription;
 use App\Domain\Vacancy\VacancyFilter;
 use App\Domain\Vacancy\VacancyId;
+use App\Domain\Vacancy\VacancyPositions;
 use App\Domain\Vacancy\VacancyStatus;
 use App\Domain\Vacancy\VacancyTitle;
 use App\Infrastructure\Persistence\Database;
@@ -69,7 +79,7 @@ final class PdoRepositoriesIntegrationTest extends TestCase
       VacancyId::generate(),
       VacancyTitle::fromString('Integração 100% PHP_dev'),
       VacancyDescription::fromString('Teste'),
-      VacancyStatus::Inactive
+      VacancyStatus::Closed
     );
     $repository->save($vacancy);
 
@@ -81,13 +91,111 @@ final class PdoRepositoriesIntegrationTest extends TestCase
     $repository->save($loaded);
     $this->assertTrue($repository->get($vacancy->id())?->isOpen());
 
-    $filter = new VacancyFilter(SearchTerm::tryFrom('100% PHP_dev'), VacancyStatus::Active);
-    $this->assertSame(1, $repository->countMatching($filter));
-    $this->assertCount(1, $repository->matching($filter, new PageRequest(1, 5)));
-    $this->assertSame(0, $repository->countMatching(new VacancyFilter(SearchTerm::tryFrom('1000% PHP'))));
+    // The FULLTEXT index only sees committed rows (see VacancyFullTextSearchIntegrationTest); check the document.
+    $this->assertSame(
+      'integracao 100 php dev integracao 100 php dev integracao 100 php dev teste',
+      $this->db->fetchValue('SELECT search_document FROM vacancies WHERE id = ?', [$vacancy->id()->value()])
+    );
 
     $repository->remove($vacancy->id());
     $this->assertNull($repository->get($vacancy->id()));
+  }
+
+  public function testVacancyLifecycleRoundTrip(): void
+  {
+    $repository = new PdoVacancyRepository($this->db);
+    $vacancy = Vacancy::publish(
+      VacancyId::generate(),
+      VacancyTitle::fromString('Rascunho integração'),
+      VacancyDescription::fromString('Teste'),
+      VacancyStatus::Draft,
+      new \DateTimeImmutable('2026-01-01 10:00:00'),
+      positions: VacancyPositions::fromInt(2)
+    );
+    $repository->save($vacancy);
+
+    $draft = $repository->get($vacancy->id());
+    $this->assertTrue($draft?->isDraft());
+    $this->assertSame(2, $draft?->positions()->value());
+    $ids = static fn (VacancyFilter $f): array => array_map(static fn (Vacancy $v): string => $v->id()->value(), $repository->matching($f, PageRequest::all()));
+    $this->assertNotContains($vacancy->id()->value(), $ids(VacancyFilter::openOnly()));
+    $this->assertContains($vacancy->id()->value(), $ids(new VacancyFilter(null, VacancyStatus::Draft)));
+
+    $draft->open(new \DateTimeImmutable('2026-02-01 10:00:00'));
+    $this->assertTrue($draft->closeIfFilled(2, new \DateTimeImmutable('2026-03-01 10:00:00')));
+    $repository->save($draft);
+
+    $closed = $repository->get($vacancy->id());
+    $this->assertSame(VacancyStatus::Closed, $closed?->status());
+    $this->assertSame(VacancyCloseReason::Filled, $closed?->closeReason());
+    $this->assertSame('2026-03-01 10:00:00', $closed?->closedAt()?->format('Y-m-d H:i:s'));
+    $this->assertSame('2026-02-01 10:00:00', $closed?->publishedAt()->format('Y-m-d H:i:s'));
+  }
+
+  public function testVacancyEmploymentTermsFiltersAndDeadlines(): void
+  {
+    $repository = new PdoVacancyRepository($this->db);
+    $company = Company::register(CompanyId::generate(), CompanyName::fromString('ZZTerms Ltda'), 'Teste');
+    (new PdoCompanyRepository($this->db))->save($company);
+    $companyId = $company->id();
+    $now = new \DateTimeImmutable('2026-05-10 12:00:00');
+    $publish = static fn (string $title, WorkMode $mode, EmploymentTerms $terms, ?string $deadline): Vacancy => Vacancy::publish(
+      VacancyId::generate(),
+      VacancyTitle::fromString($title),
+      VacancyDescription::fromString('Teste'),
+      VacancyStatus::Open,
+      $now,
+      $companyId,
+      WorkArea::Backend,
+      Seniority::Pleno,
+      $mode,
+      [],
+      null,
+      $terms,
+      $deadline !== null ? VacancyDeadline::fromString($deadline) : null
+    );
+
+    $curitiba = $publish(
+      'ZZTerms Curitiba',
+      WorkMode::Hibrido,
+      EmploymentTerms::of(ContractType::Pj, SalaryRange::of(9000, 12000), VacancyLocation::of('Curitiba', BrazilianState::PR), 'PLR, Plano de saúde'),
+      '2026-05-20'
+    );
+    $negotiable = $publish('ZZTerms A combinar', WorkMode::Remoto, EmploymentTerms::standard(), null);
+    $repository->save($curitiba);
+    $repository->save($negotiable);
+
+    $loaded = $repository->get($curitiba->id());
+    $this->assertSame(ContractType::Pj, $loaded?->terms()->contractType());
+    $this->assertSame('R$ 9.000 – R$ 12.000', $loaded?->terms()->salary()->label());
+    $this->assertSame('Curitiba/PR', $loaded?->terms()->location()?->label());
+    $this->assertSame(['Plano de saúde', 'PLR'], $loaded?->terms()->benefitLabels());
+    $this->assertSame('2026-05-20', $loaded?->closesAt()?->value());
+    $this->assertTrue($repository->get($negotiable->id())?->terms()->salary()->isNegotiable());
+
+    $count = static fn (?int $minSalary = null, ?BrazilianState $state = null, ?ContractType $contract = null, ?\DateTimeImmutable $at = null): int => $repository->countMatching(
+      new VacancyFilter(null, VacancyStatus::Open, $companyId, null, null, $minSalary, $state, $contract, $at ?? $now)
+    );
+    $this->assertSame(2, $count());
+    $this->assertSame(1, $count(minSalary: 12000));
+    $this->assertSame(0, $count(minSalary: 12001));
+    $this->assertSame(1, $count(state: BrazilianState::PR));
+    $this->assertSame(1, $count(contract: ContractType::Clt));
+    $this->assertSame(2, $count(at: new \DateTimeImmutable('2026-05-20 23:00:00 America/Sao_Paulo')));
+    $this->assertSame(1, $count(at: new \DateTimeImmutable('2026-05-21 00:30:00 America/Sao_Paulo')));
+
+    $expiredIds = array_map(
+      static fn (Vacancy $v): string => $v->id()->value(),
+      $repository->openPastDeadline(new \DateTimeImmutable('2026-05-21 12:00:00'))
+    );
+    $this->assertContains($curitiba->id()->value(), $expiredIds);
+    $this->assertNotContains($negotiable->id()->value(), $expiredIds);
+
+    $loaded->revise($loaded->title(), $loaded->description(), workMode: WorkMode::Remoto, terms: EmploymentTerms::standard());
+    $repository->save($loaded);
+    $revised = $repository->get($curitiba->id());
+    $this->assertNull($revised?->terms()->location());
+    $this->assertSame([], $revised?->terms()->benefitLabels());
   }
 
   public function testRoleWithGrantsAndUsers(): void
@@ -149,6 +257,64 @@ final class PdoRepositoriesIntegrationTest extends TestCase
     $this->assertSame(1, $applications->countPerVacancy()[$vacancy->id()->value()] ?? 0);
   }
 
+  public function testJobApplicationPipelineHistoryAndNotesRoundTrip(): void
+  {
+    $vacancies = new PdoVacancyRepository($this->db);
+    $users = new PdoUserRepository($this->db);
+    $applications = new PdoJobApplicationRepository($this->db);
+
+    $vacancy = Vacancy::publish(VacancyId::generate(), VacancyTitle::fromString('Vaga pipeline'), VacancyDescription::fromString('D'));
+    $vacancies->save($vacancy);
+    $candidate = User::register(
+      UserId::generate(),
+      PersonName::fromString('Candidata Pipeline'),
+      EmailAddress::fromString('pipeline.candidate@example.com'),
+      PlainPassword::fromString('123456')
+    );
+    $recruiter = User::register(
+      UserId::generate(),
+      PersonName::fromString('Recrutador Pipeline'),
+      EmailAddress::fromString('pipeline.recruiter@example.com'),
+      PlainPassword::fromString('123456')
+    );
+    $users->save($candidate);
+    $users->save($recruiter);
+
+    $application = $vacancy->receiveApplicationFrom($candidate->id(), new \DateTimeImmutable('2026-01-01 09:00:00'));
+    $applications->save($application);
+    $application->advance($recruiter->id(), new \DateTimeImmutable('2026-01-02 09:00:00'));
+    $application->reject($recruiter->id(), 'Sem experiência em Go', new \DateTimeImmutable('2026-01-03 09:00:00'));
+    $applications->save($application);
+
+    $applications->addNote(ApplicationNote::write($application->id(), $recruiter->id(), 'Primeira nota'));
+    $applications->addNote(ApplicationNote::write($application->id(), $recruiter->id(), 'Segunda nota'));
+
+    $loaded = $applications->get($application->id());
+    $this->assertNotNull($loaded);
+    $this->assertSame(ApplicationStatus::Rejected, $loaded->status());
+    $this->assertSame('Sem experiência em Go', $loaded->candidateFeedback());
+    $this->assertSame('2026-01-03 09:00:00', $loaded->statusChangedAt()->format('Y-m-d H:i:s'));
+    $this->assertSame(
+      [ApplicationStatus::Received, ApplicationStatus::InReview, ApplicationStatus::Rejected],
+      array_map(static fn ($e) => $e->to, $loaded->history())
+    );
+    $this->assertTrue($loaded->history()[2]->actorId?->equals($recruiter->id()));
+    $this->assertSame('Sem experiência em Go', $loaded->history()[2]->reason);
+
+    $notes = $applications->notesFor([$application->id()])[$application->id()->value()] ?? [];
+    $this->assertSame(['Primeira nota', 'Segunda nota'], array_map(static fn (ApplicationNote $n): string => $n->body, $notes));
+
+    $this->assertSame($application->id()->value(), $applications->findFor($candidate->id(), $vacancy->id())?->id()->value());
+    $this->assertCount(1, $applications->forCandidate($candidate->id()));
+
+    $loaded->reopen($recruiter->id());
+    $loaded->withdraw($candidate->id());
+    $applications->save($loaded);
+    $this->assertSame([], $applications->vacancyIdsAppliedBy($candidate->id()));
+    $this->assertArrayNotHasKey($vacancy->id()->value(), $applications->countPerVacancy());
+    $this->assertCount(5, $applications->get($application->id())?->history() ?? []);
+  }
+
   public function testCompanyCandidateProfileAndVacancyTopicsRoundTrip(): void
   {
     $companies = new PdoCompanyRepository($this->db);
@@ -199,7 +365,7 @@ final class PdoRepositoriesIntegrationTest extends TestCase
       VacancyId::generate(),
       VacancyTitle::fromString('Arquiteta PHP'),
       VacancyDescription::fromString('Liderança técnica'),
-      VacancyStatus::Active,
+      VacancyStatus::Open,
       null,
       $company->id(),
       WorkArea::Backend,
@@ -213,6 +379,6 @@ final class PdoRepositoriesIntegrationTest extends TestCase
     $this->assertNotNull($loadedVacancy);
     $this->assertTrue($loadedVacancy->belongsToCompany($company->id()));
     $this->assertSame(['DDD', 'PHP'], $loadedVacancy->topicLabels());
-    $this->assertSame(1, $vacancies->countMatching(new VacancyFilter(null, VacancyStatus::Active, $company->id(), WorkArea::Backend)));
+    $this->assertSame(1, $vacancies->countMatching(new VacancyFilter(null, VacancyStatus::Open, $company->id(), WorkArea::Backend)));
   }
 }

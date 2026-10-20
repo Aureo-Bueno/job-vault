@@ -8,6 +8,7 @@ return [
   'vacancies/delete' => PAGE_PATH . '/vacancies-delete.php',
   'vacancies/applicants' => PAGE_PATH . '/vacancies-applicants.php',
   'vacancies/apply' => PAGE_PATH . '/vacancies-apply.php',
+  'applications' => PAGE_PATH . '/applications-mine.php',
   'profile' => PAGE_PATH . '/profile.php',
   'company' => PAGE_PATH . '/company.php',
   'login' => PAGE_PATH . '/auth.php',

@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Presentation;
 
+use App\Application\Exceptions\ConflictException;
 use App\Application\Exceptions\ForbiddenException;
 use App\Application\Exceptions\MessageValidationException;
 use App\Application\Exceptions\NotFoundException;
@@ -51,6 +52,15 @@ final class ExceptionHttpMapperTest extends TestCase
     $this->assertSame(409, $conflict['httpCode']);
     $this->assertSame('conflict', $conflict['status']);
     $this->assertSame('Você já se candidatou a esta vaga.', $conflict['message']);
+  }
+
+  public function testMapsStaleDataConflictTo409(): void
+  {
+    $payload = ExceptionHttpMapper::toPayload(new ConflictException('Movida por outra pessoa.'));
+
+    $this->assertSame(409, $payload['httpCode']);
+    $this->assertSame('conflict', $payload['status']);
+    $this->assertSame('Movida por outra pessoa.', $payload['message']);
   }
 
   public function testMapsDatabaseExceptionsWithoutLeakingDetails(): void

@@ -9,6 +9,7 @@ use App\Application\Features\Vacancies\VacancyAccessScope;
 use App\Application\Features\Vacancies\VacancyLoader;
 use App\Application\Queries\Applications\ListVacancyApplicantsQuery;
 use App\Domain\CandidateProfile\CandidateProfileRepositoryInterface;
+use App\Domain\JobApplication\ApplicationStatus;
 use App\Domain\JobApplication\JobApplication;
 use App\Domain\JobApplication\JobApplicationRepositoryInterface;
 use App\Domain\Matching\MatchCalculator;
@@ -53,7 +54,11 @@ final class ListVacancyApplicantsHandler implements QueryHandlerInterface
 
     $candidateIds = array_map(static fn (JobApplication $a): UserId => $a->candidateId(), $applications);
     $profilesByUser = $this->profiles->getByUserIds($candidateIds);
+    $notesByApplication = $this->applications->notesFor(
+      array_map(static fn (JobApplication $a) => $a->id(), $applications)
+    );
     $calculator = $this->calculator ?? new MatchCalculator();
+    $views = new ApplicationViews($this->users);
 
     $items = [];
     foreach ($applications as $application) {
@@ -65,6 +70,7 @@ final class ListVacancyApplicantsHandler implements QueryHandlerInterface
 
       $profile = $profilesByUser[$candidateId->value()] ?? null;
       $match = $calculator->calculate($profile, $vacancy);
+      $status = $application->status();
 
       $items[] = new VacancyApplicantDto(
         $application->id()->value(),
@@ -84,7 +90,16 @@ final class ListVacancyApplicantsHandler implements QueryHandlerInterface
         $match->score,
         $match->level(),
         $match->matchedTopics,
-        $match->missingTopics
+        $match->missingTopics,
+        $status->value,
+        $status->label(),
+        $application->statusChangedAt()->format('Y-m-d H:i:s'),
+        $application->candidateFeedback() ?? '',
+        $status->next()?->label(),
+        $status->canTransitionTo(ApplicationStatus::Rejected),
+        $status === ApplicationStatus::Rejected,
+        $views->recruiterHistory($application),
+        $views->notes($notesByApplication[$application->id()->value()] ?? [])
       );
     }
 

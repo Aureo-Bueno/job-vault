@@ -39,4 +39,27 @@ final class InMemoryJobApplicationRepository implements JobApplicationRepository
 
     return $ids;
   }
+
+  public function forVacancy(VacancyId $vacancyId): array
+  {
+    $items = [];
+    foreach ($this->applications as $application) {
+      if ($application->vacancyId()->equals($vacancyId)) {
+        $items[] = $application;
+      }
+    }
+
+    return $items;
+  }
+
+  public function countPerVacancy(): array
+  {
+    $counts = [];
+    foreach ($this->applications as $application) {
+      $key = $application->vacancyId()->value();
+      $counts[$key] = ($counts[$key] ?? 0) + 1;
+    }
+
+    return $counts;
+  }
 }

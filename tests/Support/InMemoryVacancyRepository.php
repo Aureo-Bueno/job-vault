@@ -21,11 +21,27 @@ final class InMemoryVacancyRepository implements VacancyRepositoryInterface
   public function matching(VacancyFilter $filter, PageRequest $page): array
   {
     $matches = array_values(array_filter($this->vacancies, static function (Vacancy $vacancy) use ($filter): bool {
-      if ($filter->title !== null && !$filter->title->matches($vacancy->title()->value())) {
+      if ($filter->title !== null && !$filter->title->matches($vacancy->title()->value(), ...$vacancy->topicLabels())) {
         return false;
       }
 
-      return $filter->status === null || $vacancy->status() === $filter->status;
+      if ($filter->status !== null && $vacancy->status() !== $filter->status) {
+        return false;
+      }
+
+      if ($filter->companyId !== null && ($vacancy->companyId() === null || !$vacancy->companyId()->equals($filter->companyId))) {
+        return false;
+      }
+
+      if ($filter->area !== null && $vacancy->area() !== $filter->area) {
+        return false;
+      }
+
+      if ($filter->workMode !== null && $vacancy->workMode() !== $filter->workMode) {
+        return false;
+      }
+
+      return true;
     }));
 
     usort($matches, static fn (Vacancy $a, Vacancy $b): int => $b->publishedAt() <=> $a->publishedAt());

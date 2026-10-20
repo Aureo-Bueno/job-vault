@@ -60,6 +60,18 @@ final class InMemoryUserRepository implements UserRepositoryInterface
     return $counts;
   }
 
+  public function countPerCompany(): array
+  {
+    $counts = [];
+    foreach ($this->users as $user) {
+      if ($user->companyId() !== null) {
+        $counts[$user->companyId()->value()] = ($counts[$user->companyId()->value()] ?? 0) + 1;
+      }
+    }
+
+    return $counts;
+  }
+
   public function save(User $user): void
   {
     $this->users[$user->id()->value()] = clone $user;

@@ -27,6 +27,15 @@ final class JobApplication
     return new self(JobApplicationId::generate(), $vacancyId, $candidateId, $now ?? new DateTimeImmutable());
   }
 
+  public static function reconstitute(
+    JobApplicationId $id,
+    VacancyId $vacancyId,
+    UserId $candidateId,
+    DateTimeImmutable $submittedAt
+  ): self {
+    return new self($id, $vacancyId, $candidateId, $submittedAt);
+  }
+
   public function id(): JobApplicationId
   {
     return $this->id;

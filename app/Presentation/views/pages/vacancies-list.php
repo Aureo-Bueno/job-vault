@@ -1,135 +1,164 @@
 <?php
-// Expecting: $alerta, $vacancies, $canEdit, $canDelete, $canCreate, $pagination, $search, $statusFilter, $queryString
+/**
+ * @var array|null $alerta
+ * @var \App\Application\DTOs\VacancyDto[] $vacancies
+ * @var bool $canEdit
+ * @var bool $canDelete
+ * @var bool $canCreate
+ * @var bool $isAdmin
+ * @var \App\Application\DTOs\CompanyDto|null $myCompany
+ * @var array<string,string> $areas
+ * @var string $areaFilter
+ * @var array $pagination
+ * @var string $search
+ * @var string $statusFilter
+ * @var string $queryString
+ * @var int $total
+ */
+use App\Presentation\View;
+
+$hasFilters = $search !== '' || $statusFilter !== '' || ($areaFilter ?? '') !== '';
+$summary = $total === 1 ? '1 vaga' : $total . ' vagas';
 ?>
 
-<section class="container-content page-section p-3 p-lg-4">
-  <?php if (!empty($alerta)) : ?>
-    <div class="alert alert-<?= htmlspecialchars($alerta['tipo']) ?> alert-dismissible fade show mb-4" role="alert" data-auto-close="true">
-      <i class="<?= htmlspecialchars($alerta['icone']) ?> me-1"></i>
-      <?= htmlspecialchars($alerta['mensagem']) ?>
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+<header class="jv-page-head">
+  <div>
+    <p class="jv-eyebrow"><?= !empty($myCompany) ? htmlspecialchars($myCompany->name) : 'Vagas' ?></p>
+    <h1 class="jv-title">Painel de vagas</h1>
+    <p class="jv-subtitle">
+      <?= htmlspecialchars($hasFilters ? $summary . ' encontradas com os filtros atuais' : $summary . ' cadastradas') ?>
+      <?php if (!empty($myCompany)) : ?>
+        · vinculadas à sua empresa
+      <?php endif; ?>
+    </p>
+  </div>
+  <?php if ($canCreate) : ?>
+    <div class="jv-page-actions">
+      <a href="index.php?r=vacancies/new" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Nova vaga
+      </a>
     </div>
   <?php endif; ?>
+</header>
 
-  <div class="section-head">
-    <div>
-      <h2 class="section-title"><i class="bi bi-briefcase-fill text-info"></i> Vagas de emprego</h2>
-      <p class="section-subtitle">Busque, filtre e gerencie vagas com visão clara por status.</p>
-    </div>
-    <?php if ($canCreate) : ?>
-      <a href="index.php?r=vacancies/new" class="btn btn-primary">
-        <i class="bi bi-plus-circle-fill"></i> Nova vaga
-      </a>
+<?php View::partial('alert', ['alerta' => $alerta]); ?>
+
+<section class="jv-panel">
+  <form method="GET" class="jv-toolbar" role="search">
+    <input type="hidden" name="r" value="vacancies">
+    <label class="jv-search mb-0">
+      <span class="visually-hidden">Buscar por título ou tópico</span>
+      <i class="bi bi-search" aria-hidden="true"></i>
+      <input type="search" name="search" class="form-control" placeholder="Buscar por título ou tópico (ex.: PHP, React)" value="<?= htmlspecialchars($search) ?>" autocomplete="off">
+    </label>
+    <label class="visually-hidden" for="area_filter">Área</label>
+    <select name="area_filter" id="area_filter" class="form-select">
+      <option value="">Todas as áreas</option>
+      <?php foreach ($areas as $val => $label) : ?>
+        <option value="<?= htmlspecialchars($val) ?>" <?= ($areaFilter ?? '') === $val ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+      <?php endforeach; ?>
+    </select>
+    <label class="visually-hidden" for="status_filter">Status</label>
+    <select name="status_filter" id="status_filter" class="form-select">
+      <option value="">Todos os status</option>
+      <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Ativas</option>
+      <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Inativas</option>
+    </select>
+    <button type="submit" class="btn btn-ghost"><i class="bi bi-funnel"></i> Filtrar</button>
+    <?php if ($hasFilters) : ?>
+      <a href="index.php?r=vacancies" class="btn btn-link text-muted px-2">Limpar</a>
     <?php endif; ?>
-  </div>
+  </form>
 
-  <div class="card toolbar-card">
-    <div class="card-body">
-      <form method="GET" class="row g-3 align-items-end">
-        <div class="col-12 col-lg-5">
-          <label for="search" class="form-label"><i class="bi bi-search"></i> Buscar por título</label>
-          <input
-            type="text"
-            name="search"
-            id="search"
-            class="form-control"
-            placeholder="Ex: Desenvolvedor PHP"
-            value="<?= htmlspecialchars($search) ?>"
-            autocomplete="off">
-        </div>
-
-        <div class="col-12 col-lg-4">
-          <label for="status_filter" class="form-label"><i class="bi bi-funnel-fill"></i> Status</label>
-          <select name="status_filter" id="status_filter" class="form-select">
-            <option value="">Todos</option>
-            <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Ativo</option>
-            <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Inativo</option>
-          </select>
-        </div>
-
-        <div class="col-12 col-lg-3 d-grid">
-          <button type="submit" class="btn btn-primary">
-            <i class="bi bi-funnel"></i> Aplicar filtro
-          </button>
-        </div>
-      </form>
+  <?php if (empty($vacancies)) : ?>
+    <div class="jv-empty">
+      <i class="bi bi-briefcase" aria-hidden="true"></i>
+      <strong><?= $hasFilters ? 'Nenhuma vaga com esses filtros' : 'Nenhuma vaga cadastrada' ?></strong>
+      <?= $hasFilters ? 'Ajuste a busca ou limpe os filtros.' : ($canCreate ? 'Publique a primeira vaga para começar a receber candidaturas.' : '') ?>
     </div>
-  </div>
-
-  <div class="card">
+  <?php else : ?>
     <div class="table-responsive">
-      <table class="table table-hover align-middle">
+      <table class="table jv-table jv-table-stack table-hover">
         <thead>
           <tr>
-            <th>#</th>
-            <th>Título</th>
-            <th>Descrição</th>
-            <th>Status</th>
-            <th>Criada em</th>
-            <th class="text-end">Ações</th>
+            <th scope="col">Vaga &amp; Tópicos</th>
+            <th scope="col">Perfil</th>
+            <th scope="col">Candidatos</th>
+            <th scope="col">Status</th>
+            <th scope="col">Publicada em</th>
+            <?php if ($canEdit || $canDelete) : ?>
+              <th scope="col" class="text-end"><span class="visually-hidden">Ações</span></th>
+            <?php endif; ?>
           </tr>
         </thead>
         <tbody>
-          <?php if (empty($vacancies)) : ?>
-            <tr>
-              <td colspan="6" class="empty-state">
-                <i class="bi bi-inbox"></i> Nenhuma vaga encontrada com os filtros atuais.
+          <?php foreach ($vacancies as $vacancy) : ?>
+            <?php
+            $vacancyId = urlencode($vacancy->id);
+            $published = $vacancy->createdAt !== '' ? date('d/m/Y', strtotime($vacancy->createdAt)) : '—';
+            ?>
+            <tr class="jv-rail <?= $vacancy->isActive ? 'jv-rail--active' : 'jv-rail--inactive' ?>">
+              <td data-label="">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                  <span class="jv-cell-title mb-0"><?= htmlspecialchars($vacancy->title) ?></span>
+                  <?php if ($vacancy->companyName !== '') : ?>
+                    <span class="jv-badge jv-badge--info"><i class="bi bi-building me-1"></i><?= htmlspecialchars($vacancy->companyName) ?></span>
+                  <?php endif; ?>
+                </div>
+                <span class="jv-cell-sub jv-clamp mb-2"><?= htmlspecialchars($vacancy->description) ?></span>
+                <?php if (!empty($vacancy->topics)) : ?>
+                  <div class="jv-chips">
+                    <?php foreach ($vacancy->topics as $topic) : ?>
+                      <span class="jv-chip jv-chip--static"><?= htmlspecialchars($topic) ?></span>
+                    <?php endforeach; ?>
+                  </div>
+                <?php endif; ?>
               </td>
-            </tr>
-          <?php else : ?>
-            <?php foreach ($vacancies as $index => $vacancy) : ?>
-              <?php
-              $statusAtivo = $vacancy->isActive;
-              $badgeClass = $statusAtivo ? 'bg-success' : 'bg-secondary';
-              $statusText = $statusAtivo ? 'Ativo' : 'Inativo';
-              $descricaoCurta = trim((string) ($vacancy->description ?? ''));
-              $descricaoPreview = strlen($descricaoCurta) > 88 ? substr($descricaoCurta, 0, 88) . '...' : $descricaoCurta;
-              $dataFormatada = !empty($vacancy->createdAt) ? date('d/m/Y H:i', strtotime($vacancy->createdAt)) : '-';
-              $vacancyId = (string) ($vacancy->id ?? '');
-              ?>
-              <tr>
-                <td><strong><?= $index + 1 ?></strong></td>
-                <td><strong><?= htmlspecialchars($vacancy->title ?? '') ?></strong></td>
-                <td class="text-muted small"><?= htmlspecialchars($descricaoPreview) ?></td>
-                <td><span class="badge status-badge <?= $badgeClass ?>"><?= htmlspecialchars($statusText) ?></span></td>
-                <td class="small text-nowrap"><?= htmlspecialchars($dataFormatada) ?></td>
-                <td>
-                  <div class="d-flex justify-content-end gap-2 flex-wrap">
+              <td data-label="Perfil" class="text-nowrap">
+                <div class="d-flex flex-column gap-1 align-items-start">
+                  <span class="jv-badge"><?= htmlspecialchars($vacancy->areaLabel) ?></span>
+                  <span class="text-muted small"><?= htmlspecialchars($vacancy->seniorityLabel) ?> · <?= htmlspecialchars($vacancy->workModeLabel) ?></span>
+                </div>
+              </td>
+              <td data-label="Candidatos" class="text-nowrap">
+                <a href="index.php?r=vacancies/applicants&amp;id=<?= $vacancyId ?>" class="btn btn-ghost btn-sm">
+                  <i class="bi bi-people"></i>
+                  <?= (int) $vacancy->applicantCount ?> <?= $vacancy->applicantCount === 1 ? 'inscrito' : 'inscritos' ?>
+                </a>
+              </td>
+              <td data-label="Status">
+                <span class="jv-status <?= $vacancy->isActive ? 'jv-status--active' : 'jv-status--inactive' ?>">
+                  <?= $vacancy->isActive ? 'Ativa' : 'Inativa' ?>
+                </span>
+              </td>
+              <td data-label="Publicada em" class="text-nowrap"><span class="jv-mono text-muted"><?= htmlspecialchars($published) ?></span></td>
+              <?php if ($canEdit || $canDelete) : ?>
+                <td data-label="">
+                  <div class="jv-actions">
                     <?php if ($canEdit) : ?>
-                      <a href="index.php?r=vacancies/edit&id=<?= htmlspecialchars($vacancyId) ?>" class="btn btn-primary btn-sm">
-                        <i class="bi bi-pencil-fill"></i> Editar
+                      <a href="index.php?r=vacancies/edit&amp;id=<?= $vacancyId ?>" class="jv-icon-btn" title="Editar" aria-label="Editar <?= htmlspecialchars($vacancy->title) ?>">
+                        <i class="bi bi-pencil"></i>
                       </a>
                     <?php endif; ?>
-
                     <?php if ($canDelete) : ?>
-                      <a href="index.php?r=vacancies/delete&id=<?= htmlspecialchars($vacancyId) ?>" class="btn btn-danger btn-sm">
-                        <i class="bi bi-trash-fill"></i> Excluir
+                      <a href="index.php?r=vacancies/delete&amp;id=<?= $vacancyId ?>" class="jv-icon-btn jv-icon-btn--danger" title="Excluir" aria-label="Excluir <?= htmlspecialchars($vacancy->title) ?>">
+                        <i class="bi bi-trash3"></i>
                       </a>
-                    <?php endif; ?>
-
-                    <?php if (!$canEdit && !$canDelete) : ?>
-                      <span class="badge status-badge bg-secondary">Sem permissões</span>
                     <?php endif; ?>
                   </div>
                 </td>
-              </tr>
-            <?php endforeach; ?>
-          <?php endif; ?>
+              <?php endif; ?>
+            </tr>
+          <?php endforeach; ?>
         </tbody>
       </table>
     </div>
-  </div>
 
-  <?php if (!empty($pagination)) : ?>
-    <nav class="d-flex justify-content-center mt-4 app-pagination" aria-label="Paginação de vagas">
-      <div class="d-flex gap-2 flex-wrap justify-content-center">
-        <?php foreach ($pagination as $pagina) : ?>
-          <?php $class = $pagina['atual'] ? 'btn-primary' : 'btn-outline-secondary'; ?>
-          <a href="index.php?r=vacancies&pagina=<?= $pagina['pagina'] ?><?= $queryString ? '&' . $queryString : '' ?>" class="btn <?= $class ?>">
-            <?= $pagina['pagina'] ?>
-          </a>
-        <?php endforeach; ?>
-      </div>
-    </nav>
+    <?php View::partial('pagination', [
+      'pagination' => $pagination,
+      'baseUrl' => 'index.php?r=vacancies',
+      'queryString' => $queryString,
+      'summary' => $summary,
+    ]); ?>
   <?php endif; ?>
 </section>

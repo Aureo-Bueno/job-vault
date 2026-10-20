@@ -7,6 +7,7 @@
 use App\Application\Commands\Users\UpdateUserCommand;
 use App\Application\Exceptions\MessageValidationException;
 use App\Application\Exceptions\NotFoundException;
+use App\Application\Queries\Companies\ListCompaniesQuery;
 use App\Application\Queries\Roles\ListRolesQuery;
 use App\Application\Queries\Users\GetUserByIdQuery;
 use App\Application\Security\MessageAuthorizer;
@@ -21,13 +22,20 @@ $loggedUser = PageAccess::requireLogin();
 PageAccess::requireAdmin($loggedUser);
 PageAccess::requirePermission($loggedUser, 'user.edit');
 
-$found = AppContainer::queryBus()->ask(new GetUserByIdQuery((string) ($_GET['id'] ?? '')));
+$queryBus = AppContainer::queryBus();
+$found = $queryBus->ask(new GetUserByIdQuery((string) ($_GET['id'] ?? '')));
 if ($found === null) {
   HttpRedirect::withError('users', new NotFoundException('Usuário não encontrado para edição.'));
 }
 
 $canAssignRole = PageAccess::can($loggedUser, MessageAuthorizer::ASSIGN_ROLE);
-$user = (object) ['id' => $found->id, 'name' => $found->name, 'email' => $found->email, 'roleId' => $found->roleId];
+$user = (object) [
+  'id' => $found->id,
+  'name' => $found->name,
+  'email' => $found->email,
+  'roleId' => $found->roleId,
+  'companyId' => $found->companyId,
+];
 $alerta = null;
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
@@ -36,6 +44,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
   if ($canAssignRole) {
     $user->roleId = ($_POST['role_id'] ?? '') === '' ? null : (string) $_POST['role_id'];
   }
+  $user->companyId = ($_POST['company_id'] ?? '') === '' ? null : (string) $_POST['company_id'];
 
   try {
     if (!Csrf::validateFromRequest()) {
@@ -49,7 +58,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
       $user->email,
       $password === '' ? null : $password,
       $user->roleId,
-      $canAssignRole
+      $canAssignRole,
+      $user->companyId,
+      true
     ));
   } catch (\Throwable $exception) {
     $alerta = ExceptionHttpMapper::toAlert($exception);
@@ -62,9 +73,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
 Layout::page('/pages/user-form.php', [
   'user' => $user,
-  'roles' => $canAssignRole ? AppContainer::queryBus()->ask(new ListRolesQuery()) : [],
+  'roles' => $canAssignRole ? $queryBus->ask(new ListRolesQuery()) : [],
+  'companies' => $queryBus->ask(new ListCompaniesQuery()),
   'canAssignRole' => $canAssignRole,
   'modo' => 'editar',
-  'tituloPagina' => 'Editar Usuário',
+  'tituloPagina' => 'Editar usuário',
   'alerta' => $alerta,
 ]);

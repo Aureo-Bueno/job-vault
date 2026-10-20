@@ -13,4 +13,10 @@ interface JobApplicationRepositoryInterface
 
   /** @return string[] */
   public function vacancyIdsAppliedBy(UserId $candidateId): array;
+
+  /** @return JobApplication[] */
+  public function forVacancy(VacancyId $vacancyId): array;
+
+  /** @return array<string,int> indexed by vacancy_id */
+  public function countPerVacancy(): array;
 }

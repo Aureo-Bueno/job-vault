@@ -5,7 +5,7 @@ namespace App\Application\Commands\Users;
 use App\Application\Abstractions\Command;
 
 /**
- * Updates profile, optionally password and (when changeRole is true) the role.
+ * Updates profile, optionally password, role (when changeRole is true) and company (when changeCompany is true).
  */
 final class UpdateUserCommand implements Command
 {
@@ -15,7 +15,9 @@ final class UpdateUserCommand implements Command
     public readonly string $email,
     public readonly ?string $password = null,
     public readonly ?string $roleId = null,
-    public readonly bool $changeRole = false
+    public readonly bool $changeRole = false,
+    public readonly ?string $companyId = null,
+    public readonly bool $changeCompany = false
   ) {
   }
 }

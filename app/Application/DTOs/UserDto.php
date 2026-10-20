@@ -10,7 +10,8 @@ final class UserDto
     public readonly string $id,
     public readonly string $name,
     public readonly string $email,
-    public readonly ?string $roleId
+    public readonly ?string $roleId,
+    public readonly ?string $companyId = null
   ) {
   }
 
@@ -20,7 +21,8 @@ final class UserDto
       $user->id()->value(),
       $user->name()->value(),
       $user->email()->value(),
-      $user->roleId()?->value()
+      $user->roleId()?->value(),
+      $user->companyId()?->value()
     );
   }
 }

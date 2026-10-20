@@ -1,12 +1,15 @@
 <?php
 
 /**
- * Admin panel: users, roles and permissions.
+ * Admin panel: users, companies, roles and permissions.
  *
  * Buttons/sections are shown according to the user's permissions, but every action is
  * authorized again (and only) by the command bus.
  */
 
+use App\Application\Commands\Companies\CreateCompanyCommand;
+use App\Application\Commands\Companies\DeleteCompanyCommand;
+use App\Application\Commands\Companies\UpdateCompanyCommand;
 use App\Application\Commands\Permissions\CreatePermissionCommand;
 use App\Application\Commands\Permissions\DeletePermissionCommand;
 use App\Application\Commands\Permissions\UpdatePermissionCommand;
@@ -18,9 +21,11 @@ use App\Application\Commands\Roles\UpdateRoleCommand;
 use App\Application\Commands\Users\CreateUserCommand;
 use App\Application\Commands\Users\DeleteUserCommand;
 use App\Application\Commands\Users\UpdateUserCommand;
+use App\Application\DTOs\CompanyDto;
 use App\Application\DTOs\PermissionDto;
 use App\Application\DTOs\RoleDto;
 use App\Application\Exceptions\MessageValidationException;
+use App\Application\Queries\Companies\ListCompaniesQuery;
 use App\Application\Queries\Permissions\ListPermissionsQuery;
 use App\Application\Queries\Roles\ListRolesQuery;
 use App\Application\Queries\Users\GetUserByIdQuery;
@@ -48,6 +53,8 @@ $canListUsers = PageAccess::can($loggedUser, 'user.list');
 $canCreateUsers = PageAccess::canAny($loggedUser, ['user.create', 'user.edit']);
 $canEditUsers = PageAccess::can($loggedUser, 'user.edit');
 $canDeleteUsers = PageAccess::can($loggedUser, 'user.delete');
+$canListCompanies = $canListUsers || $canCreateUsers || $canAssignRoleToUser;
+$canManageCompanies = $canCreateUsers || $canEditUsers || $canAssignRoleToUser;
 $canListRoles = $orAssign('role.list');
 $canCreateRoles = $orAssign('role.create');
 $canEditRoles = $orAssign('role.edit');
@@ -58,11 +65,30 @@ $canCreatePermissions = $orAssign('permission.create');
 $canEditPermissions = $orAssign('permission.edit');
 $canDeletePermissions = $orAssign('permission.delete');
 
+// Sections of the panel; each one is shown only when the admin can list it.
+$tabs = array_filter([
+  'users' => $canListUsers || $canCreateUsers,
+  'companies' => $canListCompanies,
+  'roles' => $canListRoles,
+  'permissions' => $canListPermissions,
+]);
+$requestedTab = (string) ($_GET['tab'] ?? $_POST['tab'] ?? '');
+$tab = isset($tabs[$requestedTab]) ? $requestedTab : (array_key_first($tabs) ?? 'users');
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+  $actionName = $post('action');
+  $actionTab = match (true) {
+    str_starts_with($actionName, 'company_') => 'companies',
+    str_starts_with($actionName, 'role_') => 'roles',
+    str_starts_with($actionName, 'permission_') => 'permissions',
+    default => 'users',
+  };
+  $back = ['tab' => $actionTab];
+
   if (!Csrf::validateFromRequest()) {
     HttpRedirect::withError('users', new MessageValidationException(
       'Falha na validação da requisição. Recarregue a página e tente novamente.'
-    ));
+    ), $back);
   }
 
   /** @var array<string,callable():array{0:object,1:string}> $actions */
@@ -71,7 +97,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
       $post('name'),
       $post('email'),
       (string) ($_POST['password'] ?? ''),
-      $canAssignRoleToUser && $post('role_id') !== '' ? $post('role_id') : null
+      $canAssignRoleToUser && $post('role_id') !== '' ? $post('role_id') : null,
+      $post('company_id') !== '' ? $post('company_id') : null
     ), 'Usuário criado com sucesso.'],
     'user_update' => static fn (): array => [new UpdateUserCommand(
       $post('user_id'),
@@ -79,9 +106,25 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
       $post('email'),
       ($_POST['password'] ?? '') !== '' ? (string) $_POST['password'] : null,
       $post('role_id') !== '' ? $post('role_id') : null,
-      $canAssignRoleToUser
+      $canAssignRoleToUser,
+      $post('company_id') !== '' ? $post('company_id') : null,
+      true
     ), 'Usuário atualizado com sucesso.'],
     'user_delete' => static fn (): array => [new DeleteUserCommand($post('user_id')), 'Usuário excluído com sucesso.'],
+    'company_create' => static fn (): array => [new CreateCompanyCommand(
+      $post('company_name'),
+      $post('company_sector') !== '' ? $post('company_sector') : 'Tecnologia',
+      $post('company_website'),
+      $post('company_description')
+    ), 'Empresa criada com sucesso.'],
+    'company_update' => static fn (): array => [new UpdateCompanyCommand(
+      $post('company_id'),
+      $post('company_name'),
+      $post('company_sector') !== '' ? $post('company_sector') : 'Tecnologia',
+      $post('company_website'),
+      $post('company_description')
+    ), 'Empresa atualizada com sucesso.'],
+    'company_delete' => static fn (): array => [new DeleteCompanyCommand($post('company_id')), 'Empresa removida com sucesso.'],
     'role_create' => static fn (): array => [
       new CreateRoleCommand($post('role_name'), $post('role_description')),
       'Role criada com sucesso.',
@@ -118,19 +161,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     ],
   ];
 
-  $action = $actions[$post('action')] ?? null;
+  $action = $actions[$actionName] ?? null;
   if ($action === null) {
-    HttpRedirect::withError('users', new MessageValidationException('Ação inválida.'));
+    HttpRedirect::withError('users', new MessageValidationException('Ação inválida.'), $back);
   }
 
   try {
     [$command, $successMessage] = $action();
     $commandBus->dispatch($command);
   } catch (\Throwable $exception) {
-    HttpRedirect::withError('users', $exception);
+    HttpRedirect::withError('users', $exception, $back);
   }
 
-  HttpRedirect::withSuccess('users', $successMessage);
+  HttpRedirect::withSuccess('users', $successMessage, $back);
 }
 
 $search = trim((string) ($_GET['search'] ?? ''));
@@ -138,6 +181,13 @@ $roleFilter = trim((string) ($_GET['role_filter'] ?? ''));
 $roleSearch = trim((string) ($_GET['role_search'] ?? ''));
 $permissionSearch = trim((string) ($_GET['permission_search'] ?? ''));
 $permissionModuleFilter = trim((string) ($_GET['permission_module_filter'] ?? ''));
+
+/** @var CompanyDto[] $companies */
+$companies = $canListCompanies ? $queryBus->ask(new ListCompaniesQuery()) : [];
+$companiesById = [];
+foreach ($companies as $company) {
+  $companiesById[$company->id] = $company->name;
+}
 
 /** @var RoleDto[] $roles */
 $roles = $canListRoles ? $queryBus->ask(new ListRolesQuery()) : [];
@@ -170,9 +220,11 @@ foreach ($roles as $role) {
 
 $users = [];
 $paginationPages = [];
+$totalUsers = 0;
 if ($canListUsers) {
   $result = $queryBus->ask(new SearchUsersQuery($search, $roleFilter, Pagination::currentPage(), 8));
   $users = $result->items;
+  $totalUsers = $result->total;
   $paginationPages = Pagination::links($result);
 }
 
@@ -184,6 +236,14 @@ sort($permissionModules);
 
 $editUserId = (string) ($_GET['edit_user_id'] ?? '');
 $editingUser = $canEditUsers && $editUserId !== '' ? $queryBus->ask(new GetUserByIdQuery($editUserId)) : null;
+
+$editCompanyId = (string) ($_GET['edit_company_id'] ?? '');
+$editingCompany = null;
+foreach ($canManageCompanies ? $companies : [] as $company) {
+  if ($company->id === $editCompanyId) {
+    $editingCompany = $company;
+  }
+}
 
 $editRoleId = (string) ($_GET['edit_role_id'] ?? '');
 $editingRole = null;
@@ -198,8 +258,13 @@ $editingPermission = $canEditPermissions ? ($permissionsById[$editPermissionId] 
 
 Layout::page('/pages/users-list.php', [
   'alerta' => StatusAlertMapper::fromRequest(),
+  'tab' => $tab,
+  'tabs' => array_keys($tabs),
+  'totalUsers' => $totalUsers,
   'loggedUserId' => $loggedUser->id,
   'users' => $users,
+  'companies' => $companies,
+  'companiesById' => $companiesById,
   'roles' => $roles,
   'filteredRoles' => $filteredRoles,
   'permissions' => $permissions,
@@ -210,6 +275,7 @@ Layout::page('/pages/users-list.php', [
   'roleUserCount' => $roleUserCount,
   'permissionModules' => $permissionModules,
   'editingUser' => $editingUser,
+  'editingCompany' => $editingCompany,
   'editingRole' => $editingRole,
   'editingPermission' => $editingPermission,
   'pagination' => $paginationPages,
@@ -223,6 +289,7 @@ Layout::page('/pages/users-list.php', [
   'canCreateUsers' => $canCreateUsers,
   'canEditUsers' => $canEditUsers,
   'canDeleteUsers' => $canDeleteUsers,
+  'canManageCompanies' => $canManageCompanies,
   'canAssignRoleToUser' => $canAssignRoleToUser,
   'canListRoles' => $canListRoles,
   'canCreateRoles' => $canCreateRoles,

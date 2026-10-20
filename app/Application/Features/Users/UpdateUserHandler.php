@@ -51,6 +51,11 @@ final class UpdateUserHandler implements CommandHandlerInterface
       $user->assignRole($roleId === null || $roleId === '' ? null : $this->registrar->existingRole($roleId));
     }
 
+    if ($command->changeCompany) {
+      $companyId = $command->companyId;
+      $user->assignCompany($companyId === null || $companyId === '' ? null : $this->registrar->existingCompany($companyId));
+    }
+
     $this->users->save($user);
   }
 }

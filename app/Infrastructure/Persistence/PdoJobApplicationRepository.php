@@ -3,6 +3,7 @@
 namespace App\Infrastructure\Persistence;
 
 use App\Domain\JobApplication\JobApplication;
+use App\Domain\JobApplication\JobApplicationId;
 use App\Domain\JobApplication\JobApplicationRepositoryInterface;
 use App\Domain\User\UserId;
 use App\Domain\Vacancy\VacancyId;
@@ -38,5 +39,34 @@ final class PdoJobApplicationRepository implements JobApplicationRepositoryInter
   {
     $rows = $this->db->fetchAll('SELECT vacancy_id FROM applications WHERE user_id = ?', [$candidateId->value()]);
     return array_map(static fn (array $row): string => (string) $row['vacancy_id'], $rows);
+  }
+
+  public function forVacancy(VacancyId $vacancyId): array
+  {
+    $rows = $this->db->fetchAll(
+      'SELECT id, vacancy_id, user_id, created_at FROM applications WHERE vacancy_id = ? ORDER BY created_at DESC, id ASC',
+      [$vacancyId->value()]
+    );
+
+    return array_map(
+      static fn (array $row): JobApplication => JobApplication::reconstitute(
+        JobApplicationId::fromString((string) $row['id']),
+        VacancyId::fromString((string) $row['vacancy_id']),
+        UserId::fromString((string) $row['user_id']),
+        Sql::toDate($row['created_at'] ?? null)
+      ),
+      $rows
+    );
+  }
+
+  public function countPerVacancy(): array
+  {
+    $rows = $this->db->fetchAll('SELECT vacancy_id, COUNT(*) AS total FROM applications GROUP BY vacancy_id');
+    $counts = [];
+    foreach ($rows as $row) {
+      $counts[(string) $row['vacancy_id']] = (int) $row['total'];
+    }
+
+    return $counts;
   }
 }

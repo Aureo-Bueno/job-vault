@@ -7,8 +7,13 @@ use App\Application\Abstractions\QueryHandlerInterface;
 use App\Application\DTOs\PagedResult;
 use App\Application\DTOs\VacancyDto;
 use App\Application\Queries\Vacancies\SearchVacanciesQuery;
+use App\Domain\Company\Company;
+use App\Domain\Company\CompanyRepositoryInterface;
+use App\Domain\JobApplication\JobApplicationRepositoryInterface;
 use App\Domain\Shared\PageRequest;
 use App\Domain\Shared\SearchTerm;
+use App\Domain\Shared\WorkArea;
+use App\Domain\Vacancy\Vacancy;
 use App\Domain\Vacancy\VacancyFilter;
 use App\Domain\Vacancy\VacancyRepositoryInterface;
 use App\Domain\Vacancy\VacancyStatus;
@@ -16,8 +21,12 @@ use InvalidArgumentException;
 
 final class SearchVacanciesHandler implements QueryHandlerInterface
 {
-  public function __construct(private VacancyRepositoryInterface $vacancies)
-  {
+  public function __construct(
+    private VacancyRepositoryInterface $vacancies,
+    private ?VacancyAccessScope $scope = null,
+    private ?CompanyRepositoryInterface $companies = null,
+    private ?JobApplicationRepositoryInterface $applications = null
+  ) {
   }
 
   public function queryClass(): string
@@ -32,15 +41,52 @@ final class SearchVacanciesHandler implements QueryHandlerInterface
       throw new InvalidArgumentException('Invalid query for ' . self::class);
     }
 
+    $scope = $this->scope ?? new VacancyAccessScope(companies: $this->companies);
+    $companyId = $scope->resolveFilterCompany($query->companyId);
+    $area = ($query->area !== null && trim($query->area) !== '')
+      ? WorkArea::tryFrom(strtolower(trim($query->area)))
+      : null;
+
     $filter = new VacancyFilter(
       SearchTerm::tryFrom($query->search),
-      $query->active === null ? null : VacancyStatus::fromBool($query->active)
+      $query->active === null ? null : VacancyStatus::fromBool($query->active),
+      $companyId,
+      $area
     );
 
     $total = $this->vacancies->countMatching($filter);
     $page = (new PageRequest($query->page, $query->perPage))->clampTo($total);
-    $items = array_map([VacancyDto::class, 'fromVacancy'], $this->vacancies->matching($filter, $page));
+    $companyById = $this->loadCompanyMap();
+    $applicantCounts = $this->applications !== null ? $this->applications->countPerVacancy() : [];
+
+    $items = array_map(
+      static function (Vacancy $vacancy) use ($companyById, $applicantCounts): VacancyDto {
+        $cid = $vacancy->companyId()?->value();
+        $company = $cid !== null ? ($companyById[$cid] ?? null) : null;
+        $count = $applicantCounts[$vacancy->id()->value()] ?? 0;
+
+        return VacancyDto::fromVacancy($vacancy, $company, $count);
+      },
+      $this->vacancies->matching($filter, $page)
+    );
 
     return new PagedResult($items, $total, $page->number, $page->size);
+  }
+
+  /**
+   * @return array<string,Company>
+   */
+  private function loadCompanyMap(): array
+  {
+    if ($this->companies === null) {
+      return [];
+    }
+
+    $map = [];
+    foreach ($this->companies->all() as $company) {
+      $map[$company->id()->value()] = $company;
+    }
+
+    return $map;
   }
 }

@@ -2,48 +2,119 @@
 
 namespace App\Domain\Vacancy;
 
+use App\Domain\Company\CompanyId;
 use App\Domain\JobApplication\JobApplication;
+use App\Domain\Shared\Seniority;
+use App\Domain\Shared\TopicTag;
+use App\Domain\Shared\WorkArea;
+use App\Domain\Shared\WorkMode;
 use App\Domain\User\UserId;
 use DateTimeImmutable;
 
 /**
- * Vacancy aggregate: a job opening that may receive applications while active.
+ * Vacancy aggregate: a job opening published by a company that may receive applications while active.
  */
 final class Vacancy
 {
+  /**
+   * @param list<TopicTag> $topics
+   */
   private function __construct(
     private VacancyId $id,
     private VacancyTitle $title,
     private VacancyDescription $description,
     private VacancyStatus $status,
-    private DateTimeImmutable $publishedAt
+    private DateTimeImmutable $publishedAt,
+    private ?CompanyId $companyId = null,
+    private WorkArea $area = WorkArea::Backend,
+    private Seniority $seniority = Seniority::Pleno,
+    private WorkMode $workMode = WorkMode::Remoto,
+    private array $topics = []
   ) {
   }
 
+  /**
+   * @param string|iterable<mixed> $topics
+   */
   public static function publish(
     VacancyId $id,
     VacancyTitle $title,
     VacancyDescription $description,
     VacancyStatus $status = VacancyStatus::Active,
-    ?DateTimeImmutable $now = null
+    ?DateTimeImmutable $now = null,
+    ?CompanyId $companyId = null,
+    WorkArea $area = WorkArea::Backend,
+    Seniority $seniority = Seniority::Pleno,
+    WorkMode $workMode = WorkMode::Remoto,
+    string|iterable $topics = []
   ): self {
-    return new self($id, $title, $description, $status, $now ?? new DateTimeImmutable());
+    return new self(
+      $id,
+      $title,
+      $description,
+      $status,
+      $now ?? new DateTimeImmutable(),
+      $companyId,
+      $area,
+      $seniority,
+      $workMode,
+      TopicTag::listFromInput($topics)
+    );
   }
 
+  /**
+   * @param list<TopicTag> $topics
+   */
   public static function reconstitute(
     VacancyId $id,
     VacancyTitle $title,
     VacancyDescription $description,
     VacancyStatus $status,
-    DateTimeImmutable $publishedAt
+    DateTimeImmutable $publishedAt,
+    ?CompanyId $companyId = null,
+    WorkArea $area = WorkArea::Backend,
+    Seniority $seniority = Seniority::Pleno,
+    WorkMode $workMode = WorkMode::Remoto,
+    array $topics = []
   ): self {
-    return new self($id, $title, $description, $status, $publishedAt);
+    return new self($id, $title, $description, $status, $publishedAt, $companyId, $area, $seniority, $workMode, array_values($topics));
   }
 
-  public function revise(VacancyTitle $title, VacancyDescription $description): void
-  {
+  /**
+   * @param string|iterable<mixed>|null $topics
+   */
+  public function revise(
+    VacancyTitle $title,
+    VacancyDescription $description,
+    ?WorkArea $area = null,
+    ?Seniority $seniority = null,
+    ?WorkMode $workMode = null,
+    string|iterable|null $topics = null
+  ): void {
     $this->title = $title;
     $this->description = $description;
+    if ($area !== null) {
+      $this->area = $area;
+    }
+    if ($seniority !== null) {
+      $this->seniority = $seniority;
+    }
+    if ($workMode !== null) {
+      $this->workMode = $workMode;
+    }
+    if ($topics !== null) {
+      $this->topics = TopicTag::listFromInput($topics);
+    }
+  }
+
+  public function assignCompany(?CompanyId $companyId): void
+  {
+    $this->companyId = $companyId;
+  }
+
+  public function belongsToCompany(CompanyId $companyId): bool
+  {
+    return $this->companyId !== null && $this->companyId->equals($companyId);
   }
 
   public function open(): void
@@ -101,5 +172,41 @@ final class Vacancy
   public function publishedAt(): DateTimeImmutable
   {
     return $this->publishedAt;
+  }
+
+  public function companyId(): ?CompanyId
+  {
+    return $this->companyId;
+  }
+
+  public function area(): WorkArea
+  {
+    return $this->area;
+  }
+
+  public function seniority(): Seniority
+  {
+    return $this->seniority;
+  }
+
+  public function workMode(): WorkMode
+  {
+    return $this->workMode;
+  }
+
+  /**
+   * @return list<TopicTag>
+   */
+  public function topics(): array
+  {
+    return $this->topics;
+  }
+
+  /**
+   * @return list<string>
+   */
+  public function topicLabels(): array
+  {
+    return array_map(static fn (TopicTag $t): string => $t->label(), $this->topics);
   }
 }

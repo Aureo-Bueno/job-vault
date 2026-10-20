@@ -1,29 +1,32 @@
 <?php
-// Expecting: $user
+/**
+ * @var \App\Application\DTOs\UserDto $user
+ */
+use App\Presentation\Support\Csrf;
 ?>
 
-<section class="container-content page-section p-3 p-lg-4">
-  <div class="section-head">
+<div class="jv-confirm">
+  <header class="jv-page-head">
     <div>
-      <h2 class="section-title"><i class="bi bi-trash-fill text-danger"></i> Excluir usuário</h2>
-      <p class="section-subtitle">Essa ação remove o usuário e não pode ser desfeita.</p>
+      <p class="jv-eyebrow"><a href="index.php?r=users" class="text-reset text-decoration-none">Usuários</a> / Excluir</p>
+      <h1 class="jv-title">Excluir usuário</h1>
     </div>
-  </div>
+  </header>
 
-  <form method="POST" class="card">
-    <?= \App\Presentation\Support\Csrf::input() ?>
-    <div class="card-body p-4">
-      <p class="text-muted mb-4">
-        Confirmar exclusão de <strong class="text-white"><?= htmlspecialchars($user->name ?? '') ?></strong>?
-      </p>
-      <div class="d-flex flex-wrap gap-2">
-        <a href="index.php?r=users" class="btn btn-outline-secondary">
-          Cancelar
-        </a>
-        <button type="submit" name="excluir" class="btn btn-danger">
-          <i class="bi bi-trash-fill"></i> Excluir usuário
-        </button>
-      </div>
+  <form method="POST" class="jv-panel jv-panel-body">
+    <?= Csrf::input() ?>
+    <div class="jv-confirm-icon" aria-hidden="true"><i class="bi bi-person-x"></i></div>
+    <p class="mb-1">
+      <strong class="text-white"><?= htmlspecialchars($user->name) ?></strong>
+      <span class="text-muted">(<?= htmlspecialchars($user->email) ?>)</span> perderá o acesso e as candidaturas dele serão removidas.
+    </p>
+    <p class="text-muted mb-0">Essa ação não pode ser desfeita.</p>
+
+    <div class="jv-form-actions">
+      <a href="index.php?r=users" class="btn btn-ghost">Manter usuário</a>
+      <button type="submit" name="excluir" value="1" class="btn btn-danger">
+        <i class="bi bi-trash3"></i> Excluir usuário
+      </button>
     </div>
   </form>
-</section>
+</div>

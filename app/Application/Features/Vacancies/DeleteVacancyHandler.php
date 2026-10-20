@@ -10,8 +10,10 @@ use InvalidArgumentException;
 
 final class DeleteVacancyHandler implements CommandHandlerInterface
 {
-  public function __construct(private VacancyRepositoryInterface $vacancies)
-  {
+  public function __construct(
+    private VacancyRepositoryInterface $vacancies,
+    private ?VacancyAccessScope $scope = null
+  ) {
   }
 
   public function commandClass(): string
@@ -26,6 +28,8 @@ final class DeleteVacancyHandler implements CommandHandlerInterface
     }
 
     $vacancy = VacancyLoader::load($this->vacancies, $command->vacancyId);
+    ($this->scope ?? new VacancyAccessScope())->assertCanManage($vacancy);
+
     $this->vacancies->remove($vacancy->id());
   }
 }

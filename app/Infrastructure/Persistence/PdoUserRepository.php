@@ -2,6 +2,7 @@
 
 namespace App\Infrastructure\Persistence;
 
+use App\Domain\Company\CompanyId;
 use App\Domain\Role\RoleId;
 use App\Domain\Shared\PageRequest;
 use App\Domain\User\EmailAddress;
@@ -14,7 +15,7 @@ use App\Domain\User\UserRepositoryInterface;
 
 final class PdoUserRepository implements UserRepositoryInterface
 {
-  private const COLUMNS = 'id, name, email, password, role_id';
+  private const COLUMNS = 'id, name, email, password, role_id, company_id';
 
   public function __construct(private Database $db)
   {
@@ -63,6 +64,20 @@ final class PdoUserRepository implements UserRepositoryInterface
     return $counts;
   }
 
+  public function countPerCompany(): array
+  {
+    $rows = $this->db->fetchAll(
+      'SELECT company_id, COUNT(*) AS total FROM users WHERE company_id IS NOT NULL GROUP BY company_id'
+    );
+
+    $counts = [];
+    foreach ($rows as $row) {
+      $counts[(string) $row['company_id']] = (int) $row['total'];
+    }
+
+    return $counts;
+  }
+
   public function save(User $user): void
   {
     $values = [
@@ -70,14 +85,15 @@ final class PdoUserRepository implements UserRepositoryInterface
       $user->email()->value(),
       $user->passwordHash()->value(),
       $user->roleId()?->value(),
+      $user->companyId()?->value(),
       $user->id()->value(),
     ];
 
     $exists = $this->db->fetchValue('SELECT 1 FROM users WHERE id = ?', [$user->id()->value()]);
     $this->db->run(
       $exists
-        ? 'UPDATE users SET name = ?, email = ?, password = ?, role_id = ? WHERE id = ?'
-        : 'INSERT INTO users (name, email, password, role_id, id) VALUES (?, ?, ?, ?, ?)',
+        ? 'UPDATE users SET name = ?, email = ?, password = ?, role_id = ?, company_id = ? WHERE id = ?'
+        : 'INSERT INTO users (name, email, password, role_id, company_id, id) VALUES (?, ?, ?, ?, ?, ?)',
       $values
     );
   }
@@ -119,7 +135,8 @@ final class PdoUserRepository implements UserRepositoryInterface
       PersonName::fromString((string) $row['name']),
       EmailAddress::fromString((string) $row['email']),
       PasswordHash::fromStored((string) $row['password']),
-      isset($row['role_id']) && $row['role_id'] !== '' ? RoleId::fromString((string) $row['role_id']) : null
+      isset($row['role_id']) && $row['role_id'] !== '' ? RoleId::fromString((string) $row['role_id']) : null,
+      isset($row['company_id']) && $row['company_id'] !== '' ? CompanyId::fromString((string) $row['company_id']) : null
     );
   }
 }

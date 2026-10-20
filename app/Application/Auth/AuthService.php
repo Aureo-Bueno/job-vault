@@ -54,6 +54,35 @@ final class AuthService implements CurrentUserProvider
     return AuthenticatedUser::fromUser($user);
   }
 
+  /**
+   * Self sign-up for a company recruiter: creates the company and assigns the 'gestor' role.
+   */
+  public function registerCompany(
+    string $name,
+    string $email,
+    string $password,
+    string $companyName,
+    string $companySector = 'Tecnologia',
+    string $companyWebsite = '',
+    string $companyDescription = ''
+  ): AuthenticatedUser {
+    $user = $this->registrar->registerCompanyAccount(
+      $name,
+      $email,
+      $password,
+      $companyName,
+      $companySector,
+      $companyWebsite,
+      $companyDescription
+    );
+    $this->logger->info('Company user registered', [
+      'user_id' => $user->id()->value(),
+      'company_id' => $user->companyId()?->value(),
+    ]);
+
+    return AuthenticatedUser::fromUser($user);
+  }
+
   public function login(AuthenticatedUser $user): void
   {
     $this->session->regenerate();

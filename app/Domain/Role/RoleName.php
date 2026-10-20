@@ -7,6 +7,7 @@ use App\Domain\Shared\Guard;
 final class RoleName implements \Stringable
 {
   public const ADMIN = 'admin';
+  public const RECRUITER = 'gestor';
   public const DEFAULT_USER = 'usuario';
   private const MAX_LENGTH = 100;
 
@@ -27,6 +28,11 @@ final class RoleName implements \Stringable
   public static function admin(): self
   {
     return new self(self::ADMIN);
+  }
+
+  public static function recruiter(): self
+  {
+    return new self(self::RECRUITER);
   }
 
   /**

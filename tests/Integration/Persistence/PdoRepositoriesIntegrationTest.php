@@ -2,6 +2,10 @@
 
 namespace Tests\Integration\Persistence;
 
+use App\Domain\CandidateProfile\CandidateProfile;
+use App\Domain\Company\Company;
+use App\Domain\Company\CompanyId;
+use App\Domain\Company\CompanyName;
 use App\Domain\Permission\Permission;
 use App\Domain\Permission\PermissionId;
 use App\Domain\Role\Role;
@@ -9,6 +13,9 @@ use App\Domain\Role\RoleId;
 use App\Domain\Role\RoleName;
 use App\Domain\Shared\PageRequest;
 use App\Domain\Shared\SearchTerm;
+use App\Domain\Shared\Seniority;
+use App\Domain\Shared\WorkArea;
+use App\Domain\Shared\WorkMode;
 use App\Domain\User\EmailAddress;
 use App\Domain\User\PersonName;
 use App\Domain\User\PlainPassword;
@@ -22,6 +29,8 @@ use App\Domain\Vacancy\VacancyId;
 use App\Domain\Vacancy\VacancyStatus;
 use App\Domain\Vacancy\VacancyTitle;
 use App\Infrastructure\Persistence\Database;
+use App\Infrastructure\Persistence\PdoCandidateProfileRepository;
+use App\Infrastructure\Persistence\PdoCompanyRepository;
 use App\Infrastructure\Persistence\PdoJobApplicationRepository;
 use App\Infrastructure\Persistence\PdoPermissionRepository;
 use App\Infrastructure\Persistence\PdoRoleRepository;
@@ -136,5 +145,74 @@ final class PdoRepositoriesIntegrationTest extends TestCase
 
     $this->assertTrue($applications->exists($user->id(), $vacancy->id()));
     $this->assertSame([$vacancy->id()->value()], $applications->vacancyIdsAppliedBy($user->id()));
+    $this->assertCount(1, $applications->forVacancy($vacancy->id()));
+    $this->assertSame(1, $applications->countPerVacancy()[$vacancy->id()->value()] ?? 0);
+  }
+
+  public function testCompanyCandidateProfileAndVacancyTopicsRoundTrip(): void
+  {
+    $companies = new PdoCompanyRepository($this->db);
+    $users = new PdoUserRepository($this->db);
+    $profiles = new PdoCandidateProfileRepository($this->db);
+    $vacancies = new PdoVacancyRepository($this->db);
+
+    $company = Company::register(
+      CompanyId::generate(),
+      CompanyName::fromString('Acme Tech Integration'),
+      'Fintech',
+      'https://acme.example.com',
+      'Pagamentos instantâneos'
+    );
+    $companies->save($company);
+    $this->assertSame('Fintech', $companies->get($company->id())?->sector());
+
+    $user = User::register(
+      UserId::generate(),
+      PersonName::fromString('Candidata Perfil'),
+      EmailAddress::fromString('perfil.integration@example.com'),
+      PlainPassword::fromString('123456'),
+      null,
+      $company->id()
+    );
+    $users->save($user);
+    $this->assertTrue($users->get($user->id())?->companyId()?->equals($company->id()));
+
+    $profile = CandidateProfile::define(
+      $user->id(),
+      'Engenheira Backend',
+      'Foco em PHP e bancos relacionais',
+      WorkArea::Backend,
+      Seniority::Senior,
+      WorkMode::Remoto,
+      'https://linkedin.com/in/candidata',
+      'https://github.com/candidata',
+      ['PHP', 'MySQL', 'Docker']
+    );
+    $profiles->save($profile);
+
+    $loadedProfile = $profiles->getByUserId($user->id());
+    $this->assertNotNull($loadedProfile);
+    $this->assertSame('Engenheira Backend', $loadedProfile->headline());
+    $this->assertSame(['Docker', 'MySQL', 'PHP'], $loadedProfile->topicLabels());
+
+    $vacancy = Vacancy::publish(
+      VacancyId::generate(),
+      VacancyTitle::fromString('Arquiteta PHP'),
+      VacancyDescription::fromString('Liderança técnica'),
+      VacancyStatus::Active,
+      null,
+      $company->id(),
+      WorkArea::Backend,
+      Seniority::Senior,
+      WorkMode::Remoto,
+      ['PHP', 'DDD']
+    );
+    $vacancies->save($vacancy);
+
+    $loadedVacancy = $vacancies->get($vacancy->id());
+    $this->assertNotNull($loadedVacancy);
+    $this->assertTrue($loadedVacancy->belongsToCompany($company->id()));
+    $this->assertSame(['DDD', 'PHP'], $loadedVacancy->topicLabels());
+    $this->assertSame(1, $vacancies->countMatching(new VacancyFilter(null, VacancyStatus::Active, $company->id(), WorkArea::Backend)));
   }
 }

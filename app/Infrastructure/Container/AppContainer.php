@@ -12,10 +12,18 @@ use App\Application\Behaviors\LoggingBehavior;
 use App\Application\Behaviors\TransactionBehavior;
 use App\Application\Features\Applications\ApplyToVacancyHandler;
 use App\Application\Features\Applications\ListMyAppliedVacancyIdsHandler;
+use App\Application\Features\Applications\ListVacancyApplicantsHandler;
+use App\Application\Features\Companies\CreateCompanyHandler;
+use App\Application\Features\Companies\DeleteCompanyHandler;
+use App\Application\Features\Companies\GetMyCompanyHandler;
+use App\Application\Features\Companies\ListCompaniesHandler;
+use App\Application\Features\Companies\UpdateCompanyHandler;
 use App\Application\Features\Permissions\CreatePermissionHandler;
 use App\Application\Features\Permissions\DeletePermissionHandler;
 use App\Application\Features\Permissions\ListPermissionsHandler;
 use App\Application\Features\Permissions\UpdatePermissionHandler;
+use App\Application\Features\Profile\GetMyCandidateProfileHandler;
+use App\Application\Features\Profile\SaveMyCandidateProfileHandler;
 use App\Application\Features\RolePermissions\AssignPermissionToRoleHandler;
 use App\Application\Features\RolePermissions\RemovePermissionFromRoleHandler;
 use App\Application\Features\Roles\CreateRoleHandler;
@@ -33,13 +41,17 @@ use App\Application\Features\Vacancies\GetVacancyByIdHandler;
 use App\Application\Features\Vacancies\ListOpenVacanciesHandler;
 use App\Application\Features\Vacancies\SearchVacanciesHandler;
 use App\Application\Features\Vacancies\UpdateVacancyHandler;
+use App\Application\Features\Vacancies\VacancyAccessScope;
 use App\Application\Ports\LoggerInterface;
 use App\Application\Ports\SessionInterface;
 use App\Application\Security\Authorization;
 use App\Application\Security\MessageAuthorizer;
 use App\Application\Security\RoleBasedAuthorization;
 use App\Application\Users\UserRegistrar;
+use App\Domain\CandidateProfile\CandidateProfileRepositoryInterface;
+use App\Domain\Company\CompanyRepositoryInterface;
 use App\Domain\JobApplication\JobApplicationRepositoryInterface;
+use App\Domain\Matching\MatchCalculator;
 use App\Domain\Permission\PermissionRepositoryInterface;
 use App\Domain\Role\RoleRepositoryInterface;
 use App\Domain\User\UserRepositoryInterface;
@@ -47,6 +59,8 @@ use App\Domain\Vacancy\VacancyRepositoryInterface;
 use App\Infrastructure\Http\NativeSession;
 use App\Infrastructure\Logging\FileLogger;
 use App\Infrastructure\Persistence\Database;
+use App\Infrastructure\Persistence\PdoCandidateProfileRepository;
+use App\Infrastructure\Persistence\PdoCompanyRepository;
 use App\Infrastructure\Persistence\PdoJobApplicationRepository;
 use App\Infrastructure\Persistence\PdoPermissionRepository;
 use App\Infrastructure\Persistence\PdoRoleRepository;
@@ -120,8 +134,12 @@ final class AppContainer
       $roles = self::roleRepository();
       $permissions = self::permissionRepository();
       $vacancies = self::vacancyRepository();
+      $companies = self::companyRepository();
+      $profiles = self::candidateProfileRepository();
       $currentUser = self::authService();
+      $authorization = self::authorization();
       $registrar = self::userRegistrar();
+      $vacancyScope = self::vacancyAccessScope();
       $database = self::database();
 
       return new SimpleCommandBus(
@@ -137,9 +155,13 @@ final class AppContainer
           new DeletePermissionHandler($permissions),
           new AssignPermissionToRoleHandler($roles, $permissions),
           new RemovePermissionFromRoleHandler($roles),
-          new CreateVacancyHandler($vacancies),
-          new UpdateVacancyHandler($vacancies),
-          new DeleteVacancyHandler($vacancies),
+          new CreateCompanyHandler($companies),
+          new UpdateCompanyHandler($companies, $users, $currentUser, $authorization),
+          new DeleteCompanyHandler($companies),
+          new SaveMyCandidateProfileHandler($profiles, $currentUser),
+          new CreateVacancyHandler($vacancies, $vacancyScope, $companies),
+          new UpdateVacancyHandler($vacancies, $vacancyScope),
+          new DeleteVacancyHandler($vacancies, $vacancyScope),
           new ApplyToVacancyHandler($vacancies, self::jobApplicationRepository(), $currentUser),
         ],
         [
@@ -160,6 +182,12 @@ final class AppContainer
     return self::shared('queryBus', static function (): QueryBusInterface {
       $users = self::userRepository();
       $vacancies = self::vacancyRepository();
+      $companies = self::companyRepository();
+      $profiles = self::candidateProfileRepository();
+      $applications = self::jobApplicationRepository();
+      $currentUser = self::authService();
+      $vacancyScope = self::vacancyAccessScope();
+      $calculator = new MatchCalculator();
 
       return new SimpleQueryBus(
         [
@@ -167,10 +195,14 @@ final class AppContainer
           new GetUserByIdHandler($users),
           new ListRolesHandler(self::roleRepository(), $users),
           new ListPermissionsHandler(self::permissionRepository()),
-          new SearchVacanciesHandler($vacancies),
-          new ListOpenVacanciesHandler($vacancies),
-          new GetVacancyByIdHandler($vacancies),
-          new ListMyAppliedVacancyIdsHandler(self::jobApplicationRepository(), self::authService()),
+          new ListCompaniesHandler($companies, $users),
+          new GetMyCompanyHandler($companies, $users, $currentUser),
+          new GetMyCandidateProfileHandler($profiles, $currentUser),
+          new SearchVacanciesHandler($vacancies, $vacancyScope, $companies, $applications),
+          new ListOpenVacanciesHandler($vacancies, $companies, $profiles, $currentUser, $calculator),
+          new GetVacancyByIdHandler($vacancies, $vacancyScope, $companies, $applications),
+          new ListMyAppliedVacancyIdsHandler($applications, $currentUser),
+          new ListVacancyApplicantsHandler($vacancies, $applications, $users, $profiles, $vacancyScope, $calculator),
         ],
         [
           new AuthorizationBehavior([self::messageAuthorizer(), 'authorize']),
@@ -178,6 +210,16 @@ final class AppContainer
         ]
       );
     });
+  }
+
+  private static function vacancyAccessScope(): VacancyAccessScope
+  {
+    return self::shared('vacancyAccessScope', static fn (): VacancyAccessScope => new VacancyAccessScope(
+      self::authService(),
+      self::userRepository(),
+      self::authorization(),
+      self::companyRepository()
+    ));
   }
 
   private static function messageAuthorizer(): MessageAuthorizer
@@ -192,7 +234,8 @@ final class AppContainer
   {
     return self::shared('userRegistrar', static fn (): UserRegistrar => new UserRegistrar(
       self::userRepository(),
-      self::roleRepository()
+      self::roleRepository(),
+      self::companyRepository()
     ));
   }
 
@@ -214,6 +257,16 @@ final class AppContainer
   private static function vacancyRepository(): VacancyRepositoryInterface
   {
     return self::shared('vacancyRepository', static fn () => new PdoVacancyRepository(self::database()));
+  }
+
+  private static function companyRepository(): CompanyRepositoryInterface
+  {
+    return self::shared('companyRepository', static fn () => new PdoCompanyRepository(self::database()));
+  }
+
+  private static function candidateProfileRepository(): CandidateProfileRepositoryInterface
+  {
+    return self::shared('candidateProfileRepository', static fn () => new PdoCandidateProfileRepository(self::database()));
   }
 
   private static function jobApplicationRepository(): JobApplicationRepositoryInterface

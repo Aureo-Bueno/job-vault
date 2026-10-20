@@ -22,6 +22,13 @@ interface UserRepositoryInterface
    */
   public function countPerRole(): array;
 
+  /**
+   * Number of users per company id.
+   *
+   * @return array<string,int>
+   */
+  public function countPerCompany(): array;
+
   public function save(User $user): void;
 
   public function remove(UserId $id): void;

@@ -2,10 +2,11 @@
 
 namespace App\Domain\User;
 
+use App\Domain\Company\CompanyId;
 use App\Domain\Role\RoleId;
 
 /**
- * User aggregate: owns identity, credentials and role assignment.
+ * User aggregate: owns identity, credentials, role assignment and optional company membership.
  */
 final class User
 {
@@ -14,7 +15,8 @@ final class User
     private PersonName $name,
     private EmailAddress $email,
     private PasswordHash $password,
-    private ?RoleId $roleId
+    private ?RoleId $roleId,
+    private ?CompanyId $companyId = null
   ) {
   }
 
@@ -23,9 +25,10 @@ final class User
     PersonName $name,
     EmailAddress $email,
     PlainPassword $password,
-    ?RoleId $roleId = null
+    ?RoleId $roleId = null,
+    ?CompanyId $companyId = null
   ): self {
-    return new self($id, $name, $email, PasswordHash::fromPlain($password), $roleId);
+    return new self($id, $name, $email, PasswordHash::fromPlain($password), $roleId, $companyId);
   }
 
   /**
@@ -36,9 +39,10 @@ final class User
     PersonName $name,
     EmailAddress $email,
     PasswordHash $password,
-    ?RoleId $roleId
+    ?RoleId $roleId,
+    ?CompanyId $companyId = null
   ): self {
-    return new self($id, $name, $email, $password, $roleId);
+    return new self($id, $name, $email, $password, $roleId, $companyId);
   }
 
   public function verifyPassword(string $plainPassword): bool
@@ -62,9 +66,19 @@ final class User
     $this->roleId = $roleId;
   }
 
+  public function assignCompany(?CompanyId $companyId): void
+  {
+    $this->companyId = $companyId;
+  }
+
   public function hasRole(): bool
   {
     return $this->roleId !== null;
+  }
+
+  public function hasCompany(): bool
+  {
+    return $this->companyId !== null;
   }
 
   public function isSameAs(UserId $id): bool
@@ -95,5 +109,10 @@ final class User
   public function roleId(): ?RoleId
   {
     return $this->roleId;
+  }
+
+  public function companyId(): ?CompanyId
+  {
+    return $this->companyId;
   }
 }

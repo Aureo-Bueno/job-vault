@@ -7,6 +7,7 @@
 use App\Application\Commands\Users\CreateUserCommand;
 use App\Application\Exceptions\ForbiddenException;
 use App\Application\Exceptions\MessageValidationException;
+use App\Application\Queries\Companies\ListCompaniesQuery;
 use App\Application\Queries\Roles\ListRolesQuery;
 use App\Application\Security\MessageAuthorizer;
 use App\Infrastructure\Container\AppContainer;
@@ -23,13 +24,14 @@ if (!PageAccess::canAny($loggedUser, ['user.create', 'user.edit'])) {
 }
 
 $canAssignRole = PageAccess::can($loggedUser, MessageAuthorizer::ASSIGN_ROLE);
-$user = (object) ['name' => '', 'email' => '', 'roleId' => null];
+$user = (object) ['name' => '', 'email' => '', 'roleId' => null, 'companyId' => null];
 $alerta = null;
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
   $user->name = trim((string) ($_POST['name'] ?? ''));
   $user->email = trim((string) ($_POST['email'] ?? ''));
   $user->roleId = $canAssignRole && ($_POST['role_id'] ?? '') !== '' ? (string) $_POST['role_id'] : null;
+  $user->companyId = ($_POST['company_id'] ?? '') !== '' ? (string) $_POST['company_id'] : null;
 
   try {
     if (!Csrf::validateFromRequest()) {
@@ -40,7 +42,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
       $user->name,
       $user->email,
       (string) ($_POST['password'] ?? ''),
-      $user->roleId
+      $user->roleId,
+      $user->companyId
     ));
   } catch (\Throwable $exception) {
     $alerta = ExceptionHttpMapper::toAlert($exception);
@@ -51,11 +54,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
   }
 }
 
+$queryBus = AppContainer::queryBus();
+
 Layout::page('/pages/user-form.php', [
   'user' => $user,
-  'roles' => $canAssignRole ? AppContainer::queryBus()->ask(new ListRolesQuery()) : [],
+  'roles' => $canAssignRole ? $queryBus->ask(new ListRolesQuery()) : [],
+  'companies' => $queryBus->ask(new ListCompaniesQuery()),
   'canAssignRole' => $canAssignRole,
   'modo' => 'criar',
-  'tituloPagina' => 'Cadastrar Usuário',
+  'tituloPagina' => 'Novo usuário',
   'alerta' => $alerta,
 ]);

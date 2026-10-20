@@ -3,9 +3,13 @@
 namespace App\Application\Security;
 
 use App\Application\Commands\Applications\ApplyToVacancyCommand;
+use App\Application\Commands\Companies\CreateCompanyCommand;
+use App\Application\Commands\Companies\DeleteCompanyCommand;
+use App\Application\Commands\Companies\UpdateCompanyCommand;
 use App\Application\Commands\Permissions\CreatePermissionCommand;
 use App\Application\Commands\Permissions\DeletePermissionCommand;
 use App\Application\Commands\Permissions\UpdatePermissionCommand;
+use App\Application\Commands\Profile\SaveMyCandidateProfileCommand;
 use App\Application\Commands\RolePermissions\AssignPermissionToRoleCommand;
 use App\Application\Commands\RolePermissions\RemovePermissionFromRoleCommand;
 use App\Application\Commands\Roles\CreateRoleCommand;
@@ -19,7 +23,12 @@ use App\Application\Commands\Vacancies\DeleteVacancyCommand;
 use App\Application\Commands\Vacancies\UpdateVacancyCommand;
 use App\Application\Exceptions\ForbiddenException;
 use App\Application\Exceptions\UnauthorizedException;
+use App\Application\Queries\Applications\ListMyAppliedVacancyIdsQuery;
+use App\Application\Queries\Applications\ListVacancyApplicantsQuery;
+use App\Application\Queries\Companies\GetMyCompanyQuery;
+use App\Application\Queries\Companies\ListCompaniesQuery;
 use App\Application\Queries\Permissions\ListPermissionsQuery;
+use App\Application\Queries\Profile\GetMyCandidateProfileQuery;
 use App\Application\Queries\Roles\ListRolesQuery;
 use App\Application\Queries\Users\GetUserByIdQuery;
 use App\Application\Queries\Users\SearchUsersQuery;
@@ -58,6 +67,11 @@ final class MessageAuthorizer
     ListPermissionsQuery::class => ['permission.list', self::ASSIGN_ROLE],
     AssignPermissionToRoleCommand::class => ['role.assign_permission', self::ASSIGN_ROLE],
     RemovePermissionFromRoleCommand::class => ['role.assign_permission', self::ASSIGN_ROLE],
+    CreateCompanyCommand::class => ['user.create', 'user.edit', self::ASSIGN_ROLE],
+    UpdateCompanyCommand::class => ['vacancy.manage', 'vacancy.create', 'user.edit'],
+    DeleteCompanyCommand::class => ['user.delete', self::ASSIGN_ROLE],
+    ListCompaniesQuery::class => ['vacancy.manage', 'vacancy.create', 'user.list'],
+    GetMyCompanyQuery::class => ['vacancy.manage', 'vacancy.create'],
     CreateVacancyCommand::class => ['vacancy.create'],
     UpdateVacancyCommand::class => ['vacancy.edit'],
     DeleteVacancyCommand::class => ['vacancy.delete'],
@@ -65,6 +79,10 @@ final class MessageAuthorizer
     ListOpenVacanciesQuery::class => ['vacancy.view'],
     GetVacancyByIdQuery::class => ['vacancy.view'],
     ApplyToVacancyCommand::class => ['vacancy.view'],
+    ListMyAppliedVacancyIdsQuery::class => ['vacancy.view'],
+    ListVacancyApplicantsQuery::class => ['vacancy.manage', 'vacancy.edit', 'vacancy.create'],
+    GetMyCandidateProfileQuery::class => ['vacancy.view'],
+    SaveMyCandidateProfileCommand::class => ['vacancy.view'],
   ];
 
   /** @var array<class-string,true> */
@@ -84,6 +102,8 @@ final class MessageAuthorizer
     ListPermissionsQuery::class => true,
     AssignPermissionToRoleCommand::class => true,
     RemovePermissionFromRoleCommand::class => true,
+    CreateCompanyCommand::class => true,
+    DeleteCompanyCommand::class => true,
   ];
 
   public function __construct(

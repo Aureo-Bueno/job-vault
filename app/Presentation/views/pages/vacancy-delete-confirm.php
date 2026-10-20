@@ -1,28 +1,31 @@
 <?php
-// Expecting: $vacancy
+/**
+ * @var \App\Application\DTOs\VacancyDto $vacancy
+ */
+use App\Presentation\Support\Csrf;
 ?>
 
-<section class="container-content page-section p-3 p-lg-4">
-  <div class="section-head">
+<div class="jv-confirm">
+  <header class="jv-page-head">
     <div>
-      <h2 class="section-title"><i class="bi bi-trash-fill text-danger"></i> Excluir vaga</h2>
-      <p class="section-subtitle">Essa ação remove a vaga definitivamente.</p>
+      <p class="jv-eyebrow"><a href="index.php?r=home" class="text-reset text-decoration-none">Vagas</a> / Excluir</p>
+      <h1 class="jv-title">Excluir vaga</h1>
     </div>
-  </div>
+  </header>
 
-  <form method="POST" class="card">
-    <?= \App\Presentation\Support\Csrf::input() ?>
-    <div class="card-body p-4">
-      <p class="text-muted mb-4">
-        Confirmar exclusão da vaga <strong class="text-white"><?= htmlspecialchars($vacancy->title ?? '') ?></strong>?
-      </p>
+  <form method="POST" class="jv-panel jv-panel-body">
+    <?= Csrf::input() ?>
+    <div class="jv-confirm-icon" aria-hidden="true"><i class="bi bi-trash3"></i></div>
+    <p class="mb-1">
+      A vaga <strong class="text-white"><?= htmlspecialchars($vacancy->title) ?></strong> será removida junto com as candidaturas recebidas.
+    </p>
+    <p class="text-muted mb-0">Essa ação não pode ser desfeita.</p>
 
-      <div class="d-flex flex-wrap gap-2">
-        <a href="index.php?r=home" class="btn btn-outline-secondary">Cancelar</a>
-        <button type="submit" name="excluir" class="btn btn-danger">
-          <i class="bi bi-trash-fill"></i> Excluir vaga
-        </button>
-      </div>
+    <div class="jv-form-actions">
+      <a href="index.php?r=home" class="btn btn-ghost">Manter vaga</a>
+      <button type="submit" name="excluir" value="1" class="btn btn-danger">
+        <i class="bi bi-trash3"></i> Excluir vaga
+      </button>
     </div>
   </form>
-</section>
+</div>

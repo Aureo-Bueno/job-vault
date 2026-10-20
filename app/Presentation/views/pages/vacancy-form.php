@@ -1,100 +1,192 @@
 <?php
-// Expecting: $vacancy (object with title, description, isActive), $tituloPagina, $alerta
-$tituloFormulario = $tituloPagina ?? 'Formulário de vaga';
+/**
+ * @var object $vacancy  {title, description, isActive, area, seniority, workMode, topics, companyId, id?}
+ * @var string $tituloPagina
+ * @var array|null $alerta
+ * @var array<string,string> $areas
+ * @var array<string,string> $seniorities
+ * @var array<string,string> $workModes
+ * @var list<string> $popularTopics
+ * @var bool $isAdmin
+ * @var \App\Application\DTOs\CompanyDto[] $companies
+ * @var \App\Application\DTOs\CompanyDto|null $myCompany
+ */
+use App\Presentation\Support\Csrf;
+use App\Presentation\View;
+
 $isActive = (bool) ($vacancy->isActive ?? true);
+$isEdit = isset($vacancy->id);
+$topics = is_array($vacancy->topics ?? null) ? $vacancy->topics : [];
+$topicsCsv = implode(', ', $topics);
+$topicMapLower = array_fill_keys(array_map('mb_strtolower', $topics), true);
 ?>
 
-<section class="container-content page-section p-3 p-lg-4">
-  <div class="section-head">
+<div class="jv-narrow">
+  <header class="jv-page-head">
     <div>
-      <h2 class="section-title"><i class="bi bi-briefcase-fill text-info"></i> <?= htmlspecialchars($tituloFormulario) ?></h2>
-      <p class="section-subtitle">Defina título, descrição e status para publicar a vaga com consistência.</p>
+      <p class="jv-eyebrow"><a href="index.php?r=home" class="text-reset text-decoration-none">Vagas</a> / <?= $isEdit ? 'Editar' : 'Nova' ?></p>
+      <h1 class="jv-title"><?= htmlspecialchars($tituloPagina) ?></h1>
+      <p class="jv-subtitle">
+        <?php if (!empty($myCompany)) : ?>
+          Publicando em nome de <strong><?= htmlspecialchars($myCompany->name) ?></strong>. Defina área e tópicos para o match automático com candidatos.
+        <?php else : ?>
+          Defina título, descrição, área e tópicos técnicos para que o sistema calcule a compatibilidade dos candidatos.
+        <?php endif; ?>
+      </p>
     </div>
-    <a href="index.php?r=home" class="btn btn-outline-secondary">
-      <i class="bi bi-arrow-left"></i> Voltar
-    </a>
-  </div>
+  </header>
 
-  <?php if (!empty($alerta)) : ?>
-    <div class="alert alert-<?= htmlspecialchars($alerta['tipo']) ?> alert-dismissible fade show mb-4" role="alert" data-auto-close="true">
-      <i class="<?= htmlspecialchars($alerta['icone']) ?> me-1"></i>
-      <?= htmlspecialchars($alerta['mensagem']) ?>
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+  <?php View::partial('alert', ['alerta' => $alerta ?? null]); ?>
+
+  <form method="POST" class="jv-panel jv-panel-body needs-validation" novalidate>
+    <?= Csrf::input() ?>
+
+    <?php if (!empty($isAdmin) && !empty($companies)) : ?>
+      <div class="mb-4">
+        <label for="company_id" class="form-label">Empresa responsável pela vaga</label>
+        <select id="company_id" name="company_id" class="form-select">
+          <option value="">Sem empresa vinculada</option>
+          <?php foreach ($companies as $company) : ?>
+            <option value="<?= htmlspecialchars($company->id) ?>" <?= ($vacancy->companyId ?? '') === $company->id ? 'selected' : '' ?>>
+              <?= htmlspecialchars($company->name) ?> (<?= htmlspecialchars($company->sector) ?>)
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+    <?php endif; ?>
+
+    <div class="mb-4">
+      <label for="title" class="form-label">Título da vaga</label>
+      <input
+        type="text"
+        class="form-control form-control-lg"
+        id="title"
+        name="title"
+        maxlength="255"
+        placeholder="Ex.: Desenvolvedor(a) PHP Sênior"
+        value="<?= htmlspecialchars($vacancy->title ?? '') ?>"
+        required>
+      <div class="invalid-feedback">Informe o título da vaga.</div>
     </div>
-  <?php endif; ?>
 
-  <div class="card">
-    <div class="card-body p-4 p-lg-5">
-      <form method="POST" class="needs-validation" novalidate>
-        <?= \App\Presentation\Support\Csrf::input() ?>
+    <div class="jv-form-grid mb-4">
+      <div>
+        <label for="area" class="form-label">Área da vaga</label>
+        <select id="area" name="area" class="form-select">
+          <?php foreach ($areas as $value => $label) : ?>
+            <option value="<?= htmlspecialchars($value) ?>" <?= ($vacancy->area ?? 'backend') === $value ? 'selected' : '' ?>>
+              <?= htmlspecialchars($label) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
 
-        <div class="mb-4">
-          <label for="title" class="form-label">
-            <i class="bi bi-file-earmark-text"></i> Título da vaga <span class="text-danger">*</span>
-          </label>
+      <div>
+        <label for="seniority" class="form-label">Senioridade esperada</label>
+        <select id="seniority" name="seniority" class="form-select">
+          <?php foreach ($seniorities as $value => $label) : ?>
+            <option value="<?= htmlspecialchars($value) ?>" <?= ($vacancy->seniority ?? 'pleno') === $value ? 'selected' : '' ?>>
+              <?= htmlspecialchars($label) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+
+      <div>
+        <label for="work_mode" class="form-label">Modalidade</label>
+        <select id="work_mode" name="work_mode" class="form-select">
+          <?php foreach ($workModes as $value => $label) : ?>
+            <option value="<?= htmlspecialchars($value) ?>" <?= ($vacancy->workMode ?? 'remoto') === $value ? 'selected' : '' ?>>
+              <?= htmlspecialchars($label) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+    </div>
+
+    <div class="mb-4" data-topic-picker>
+      <label for="vacancy-topics-input" class="form-label">Tópicos e tecnologias da vaga</label>
+      <input type="hidden" name="topics" value="<?= htmlspecialchars($topicsCsv) ?>" data-topic-hidden>
+
+      <div class="jv-topic-box">
+        <div class="jv-chips" data-topic-list>
+          <?php foreach ($topics as $topic) : ?>
+            <span class="jv-chip" data-topic-chip="<?= htmlspecialchars($topic) ?>">
+              <?= htmlspecialchars($topic) ?>
+              <button type="button" data-topic-remove="<?= htmlspecialchars($topic) ?>" aria-label="Remover <?= htmlspecialchars($topic) ?>">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </span>
+          <?php endforeach; ?>
+        </div>
+        <div class="jv-topic-entry">
           <input
             type="text"
-            class="form-control form-control-lg"
-            id="title"
-            name="title"
-            placeholder="Ex: Desenvolvedor(a) PHP Sênior"
-            value="<?= htmlspecialchars($vacancy->title ?? '') ?>"
-            required>
-          <div class="invalid-feedback" role="alert">Informe o título da vaga.</div>
-        </div>
-
-        <div class="mb-4">
-          <label for="description" class="form-label">
-            <i class="bi bi-file-text"></i> Descrição da vaga <span class="text-danger">*</span>
-          </label>
-          <textarea
-            class="form-control"
-            id="description"
-            name="description"
-            rows="8"
-            placeholder="Descreva atividades, responsabilidades, requisitos e benefícios..."
-            required><?= htmlspecialchars($vacancy->description ?? '') ?></textarea>
-          <div class="invalid-feedback" role="alert">Informe uma descrição para a vaga.</div>
-          <small class="text-muted d-block mt-2">
-            Quanto mais objetiva a descrição, melhor a qualidade das candidaturas.
-          </small>
-        </div>
-
-        <div class="mb-4">
-          <label class="form-label"><i class="bi bi-toggle-on"></i> Status da vaga</label>
-          <div class="row g-2">
-            <div class="col-12 col-md-6">
-              <input type="radio" class="btn-check" name="vacancy_status" id="active-yes" value="active" <?= $isActive ? 'checked' : '' ?>>
-              <label class="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center" for="active-yes">
-                <span><i class="bi bi-check-circle-fill text-success me-1"></i> Ativa</span>
-                <small class="text-muted">Visível para candidatos</small>
-              </label>
-            </div>
-            <div class="col-12 col-md-6">
-              <input type="radio" class="btn-check" name="vacancy_status" id="active-no" value="inactive" <?= !$isActive ? 'checked' : '' ?>>
-              <label class="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center" for="active-no">
-                <span><i class="bi bi-pause-circle-fill text-danger me-1"></i> Inativa</span>
-                <small class="text-muted">Oculta para candidatos</small>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div class="d-flex flex-wrap gap-2 pt-4 mt-2 border-top border-secondary-subtle">
-          <button type="submit" class="btn btn-primary px-4">
-            <i class="bi bi-check-lg"></i> Salvar vaga
+            id="vacancy-topics-input"
+            class="form-control form-control-sm"
+            placeholder="Digite um tópico (ex.: PHP, MySQL, Docker) e pressione Enter ou vírgula"
+            data-topic-input
+            autocomplete="off">
+          <button type="button" class="btn btn-ghost btn-sm" data-topic-add-btn>
+            <i class="bi bi-plus-lg"></i> Adicionar
           </button>
-          <a href="index.php?r=home" class="btn btn-outline-secondary px-4">
-            <i class="bi bi-x-lg"></i> Cancelar
-          </a>
         </div>
-      </form>
-    </div>
-  </div>
+      </div>
+      <div class="form-text mb-2">Os candidatos que tiverem esses tópicos no perfil ganharão maior % de match nesta vaga.</div>
 
-  <div class="alert alert-info alert-dismissible fade show mt-4" role="alert" data-auto-close="true">
-    <i class="bi bi-lightbulb-fill me-1"></i>
-    Revise o texto antes de salvar para evitar vagas com descrição incompleta.
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
-  </div>
-</section>
+      <div class="jv-topic-suggestions">
+        <span class="text-muted small me-1">Sugestões rápidas:</span>
+        <?php foreach ($popularTopics as $suggestion) : ?>
+          <?php $isAdded = isset($topicMapLower[mb_strtolower($suggestion)]); ?>
+          <button
+            type="button"
+            class="jv-suggestion-chip <?= $isAdded ? 'is-added' : '' ?>"
+            data-topic-suggest="<?= htmlspecialchars($suggestion) ?>">
+            <i class="bi <?= $isAdded ? 'bi-check2' : 'bi-plus' ?>"></i> <?= htmlspecialchars($suggestion) ?>
+          </button>
+        <?php endforeach; ?>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label for="description" class="form-label">Descrição da vaga</label>
+      <textarea
+        class="form-control"
+        id="description"
+        name="description"
+        rows="6"
+        placeholder="Atividades do dia a dia, responsabilidades, benefícios e diferenciais"
+        aria-describedby="description-help"
+        required><?= htmlspecialchars($vacancy->description ?? '') ?></textarea>
+      <div id="description-help" class="form-text">Descrições objetivas atraem candidaturas mais alinhadas.</div>
+      <div class="invalid-feedback">Informe a descrição da vaga.</div>
+    </div>
+
+    <fieldset>
+      <legend class="form-label">Status</legend>
+      <div class="jv-choice">
+        <div>
+          <input type="radio" class="btn-check" name="vacancy_status" id="status-active" value="active" <?= $isActive ? 'checked' : '' ?>>
+          <label class="jv-choice-option" for="status-active">
+            <span class="jv-status jv-status--active mt-1" aria-hidden="true"></span>
+            <span><strong>Ativa</strong><small>Visível e aceitando candidaturas</small></span>
+          </label>
+        </div>
+        <div>
+          <input type="radio" class="btn-check" name="vacancy_status" id="status-inactive" value="inactive" <?= !$isActive ? 'checked' : '' ?>>
+          <label class="jv-choice-option" for="status-inactive">
+            <span class="jv-status jv-status--inactive mt-1" aria-hidden="true"></span>
+            <span><strong>Inativa</strong><small>Oculta para candidatos</small></span>
+          </label>
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="jv-form-actions">
+      <a href="index.php?r=home" class="btn btn-ghost">Cancelar</a>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check2"></i> <?= $isEdit ? 'Salvar alterações' : 'Publicar vaga' ?>
+      </button>
+    </div>
+  </form>
+</div>

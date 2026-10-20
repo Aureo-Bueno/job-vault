@@ -26,7 +26,13 @@ final class CreateUserHandler implements CommandHandlerInterface
       throw new InvalidArgumentException('Invalid command for ' . self::class);
     }
 
-    $user = $this->registrar->register($command->name, $command->email, $command->password, $command->roleId);
+    $user = $this->registrar->register(
+      $command->name,
+      $command->email,
+      $command->password,
+      $command->roleId,
+      $command->companyId
+    );
 
     return UserDto::fromUser($user);
   }

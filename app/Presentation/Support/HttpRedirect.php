@@ -25,14 +25,20 @@ final class HttpRedirect
     self::to('index.php?' . http_build_query(['r' => $route] + $params));
   }
 
-  public static function withSuccess(string $route, ?string $message = null): never
+  /**
+   * @param array<string,scalar|null> $params extra query params (e.g. active tab)
+   */
+  public static function withSuccess(string $route, ?string $message = null, array $params = []): never
   {
-    self::route($route, array_filter(['status' => 'success', 'message' => $message]));
+    self::route($route, $params + array_filter(['status' => 'success', 'message' => $message]));
   }
 
-  public static function withError(string $route, Throwable $exception): never
+  /**
+   * @param array<string,scalar|null> $params extra query params (e.g. active tab)
+   */
+  public static function withError(string $route, Throwable $exception, array $params = []): never
   {
     $payload = ExceptionHttpMapper::toPayload($exception);
-    self::route($route, ['status' => $payload['status'], 'message' => $payload['message']]);
+    self::route($route, $params + ['status' => $payload['status'], 'message' => $payload['message']]);
   }
 }

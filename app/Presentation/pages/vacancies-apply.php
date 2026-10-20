@@ -1,13 +1,16 @@
 <?php
 
 /**
- * Open vacancies for candidates. The "only open vacancies, once per user" rules live in the domain.
+ * Open vacancies for candidates with compatibility (match) score and filters.
  */
 
 use App\Application\Commands\Applications\ApplyToVacancyCommand;
 use App\Application\Exceptions\MessageValidationException;
 use App\Application\Queries\Applications\ListMyAppliedVacancyIdsQuery;
+use App\Application\Queries\Profile\GetMyCandidateProfileQuery;
 use App\Application\Queries\Vacancies\ListOpenVacanciesQuery;
+use App\Domain\Shared\WorkArea;
+use App\Domain\Shared\WorkMode;
 use App\Infrastructure\Container\AppContainer;
 use App\Presentation\Support\Csrf;
 use App\Presentation\Support\HttpRedirect;
@@ -29,11 +32,26 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     HttpRedirect::withError('vacancies/apply', $exception);
   }
 
-  HttpRedirect::withSuccess('vacancies/apply', 'Candidatura enviada com sucesso.');
+  HttpRedirect::withSuccess('vacancies/apply', 'Candidatura enviada com sucesso! A empresa já pode avaliar seu perfil.');
 }
+
+$search = trim((string) ($_GET['search'] ?? ''));
+$areaFilter = trim((string) ($_GET['area'] ?? ''));
+$workModeFilter = trim((string) ($_GET['work_mode'] ?? ''));
+$sort = in_array($_GET['sort'] ?? 'match', ['match', 'recent'], true) ? (string) ($_GET['sort'] ?? 'match') : 'match';
+
+$profile = $queryBus->ask(new GetMyCandidateProfileQuery());
+$vacancies = $queryBus->ask(new ListOpenVacanciesQuery($search, $areaFilter, $workModeFilter, $sort));
 
 Layout::page('/pages/vacancies-apply-list.php', [
   'alerta' => StatusAlertMapper::fromRequest(),
-  'vacancies' => $queryBus->ask(new ListOpenVacanciesQuery()),
+  'profile' => $profile,
+  'vacancies' => $vacancies,
   'appliedMap' => array_fill_keys($queryBus->ask(new ListMyAppliedVacancyIdsQuery()), true),
+  'areas' => WorkArea::options(),
+  'workModes' => WorkMode::options(),
+  'search' => $search,
+  'areaFilter' => $areaFilter,
+  'workModeFilter' => $workModeFilter,
+  'sort' => $sort,
 ]);

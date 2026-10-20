@@ -5,15 +5,14 @@ namespace App\Application\Features\RolePermissions;
 use App\Application\Abstractions\Command;
 use App\Application\Abstractions\CommandHandlerInterface;
 use App\Application\Commands\RolePermissions\RemovePermissionFromRoleCommand;
-use App\Application\Service\AccessControlService;
+use App\Application\Features\Roles\AccessControlLookup;
+use App\Domain\Permission\PermissionId;
+use App\Domain\Role\RoleRepositoryInterface;
 use InvalidArgumentException;
 
-/**
- * Handles role-permission removal command.
- */
 final class RemovePermissionFromRoleHandler implements CommandHandlerInterface
 {
-  public function __construct(private AccessControlService $accessControlService)
+  public function __construct(private RoleRepositoryInterface $roles)
   {
   }
 
@@ -22,15 +21,14 @@ final class RemovePermissionFromRoleHandler implements CommandHandlerInterface
     return RemovePermissionFromRoleCommand::class;
   }
 
-  public function handle(Command $command): array
+  public function handle(Command $command): void
   {
     if (!$command instanceof RemovePermissionFromRoleCommand) {
-      throw new InvalidArgumentException('Invalid command for RemovePermissionFromRoleHandler.');
+      throw new InvalidArgumentException('Invalid command for ' . self::class);
     }
 
-    return $this->accessControlService->removePermissionFromRole(
-      $command->roleId,
-      $command->permissionId
-    );
+    $role = AccessControlLookup::role($this->roles, $command->roleId);
+    $role->revoke(PermissionId::fromString($command->permissionId));
+    $this->roles->save($role);
   }
 }

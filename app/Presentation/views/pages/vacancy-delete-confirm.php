@@ -11,7 +11,7 @@
   </div>
 
   <form method="POST" class="card">
-    <?= \App\Util\Csrf::input() ?>
+    <?= \App\Presentation\Support\Csrf::input() ?>
     <div class="card-body p-4">
       <p class="text-muted mb-4">
         Confirmar exclusão da vaga <strong class="text-white"><?= htmlspecialchars($vacancy->title ?? '') ?></strong>?

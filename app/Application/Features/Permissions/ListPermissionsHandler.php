@@ -4,17 +4,16 @@ namespace App\Application\Features\Permissions;
 
 use App\Application\Abstractions\Query;
 use App\Application\Abstractions\QueryHandlerInterface;
-use App\Application\Mappings\PermissionMapping;
+use App\Application\DTOs\PermissionDto;
 use App\Application\Queries\Permissions\ListPermissionsQuery;
-use App\Application\Service\AccessControlService;
+use App\Domain\Permission\Permission;
+use App\Domain\Permission\PermissionRepositoryInterface;
+use App\Domain\Shared\SearchTerm;
 use InvalidArgumentException;
 
-/**
- * Handles permission list query.
- */
 final class ListPermissionsHandler implements QueryHandlerInterface
 {
-  public function __construct(private AccessControlService $accessControlService)
+  public function __construct(private PermissionRepositoryInterface $permissions)
   {
   }
 
@@ -23,21 +22,30 @@ final class ListPermissionsHandler implements QueryHandlerInterface
     return ListPermissionsQuery::class;
   }
 
+  /** @return PermissionDto[] */
   public function handle(Query $query): array
   {
     if (!$query instanceof ListPermissionsQuery) {
-      throw new InvalidArgumentException('Invalid query for ListPermissionsHandler.');
+      throw new InvalidArgumentException('Invalid query for ' . self::class);
     }
 
-    $permissions = $this->accessControlService->listPermissions();
+    $permissions = $this->permissions->all();
 
-    if ($query->module !== null && $query->module !== '') {
-      $requestedModule = strtolower($query->module);
-      $permissions = array_values(array_filter($permissions, function ($permission) use ($requestedModule) {
-        return strtolower($permission->module) === $requestedModule;
-      }));
+    $module = trim((string) $query->module);
+    if ($module !== '') {
+      $permissions = array_filter($permissions, static fn (Permission $p): bool => $p->belongsToModule($module));
     }
 
-    return array_map([PermissionMapping::class, 'toDto'], $permissions);
+    $term = SearchTerm::tryFrom($query->search);
+    if ($term !== null) {
+      $permissions = array_filter($permissions, static fn (Permission $p): bool => $term->matches(
+        $p->name()->value(),
+        $p->description(),
+        $p->module(),
+        $p->action()
+      ));
+    }
+
+    return array_values(array_map([PermissionDto::class, 'fromPermission'], $permissions));
   }
 }

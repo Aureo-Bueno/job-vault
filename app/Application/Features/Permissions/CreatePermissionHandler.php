@@ -5,16 +5,16 @@ namespace App\Application\Features\Permissions;
 use App\Application\Abstractions\Command;
 use App\Application\Abstractions\CommandHandlerInterface;
 use App\Application\Commands\Permissions\CreatePermissionCommand;
-use App\Application\Mappings\PermissionMapping;
-use App\Application\Service\AccessControlService;
+use App\Application\DTOs\PermissionDto;
+use App\Application\Features\Roles\AccessControlLookup;
+use App\Domain\Permission\Permission;
+use App\Domain\Permission\PermissionId;
+use App\Domain\Permission\PermissionRepositoryInterface;
 use InvalidArgumentException;
 
-/**
- * Handles permission creation command.
- */
 final class CreatePermissionHandler implements CommandHandlerInterface
 {
-  public function __construct(private AccessControlService $accessControlService)
+  public function __construct(private PermissionRepositoryInterface $permissions)
   {
   }
 
@@ -23,25 +23,23 @@ final class CreatePermissionHandler implements CommandHandlerInterface
     return CreatePermissionCommand::class;
   }
 
-  public function handle(Command $command): array
+  public function handle(Command $command): PermissionDto
   {
     if (!$command instanceof CreatePermissionCommand) {
-      throw new InvalidArgumentException('Invalid command for CreatePermissionHandler.');
+      throw new InvalidArgumentException('Invalid command for ' . self::class);
     }
 
-    $result = $this->accessControlService->createPermission(
+    $permission = Permission::define(
+      PermissionId::generate(),
       $command->name,
       $command->description,
       $command->module,
       $command->action
     );
+    AccessControlLookup::ensurePermissionNameIsAvailable($this->permissions, $permission->name());
 
-    $permission = $result['permission'] ?? null;
+    $this->permissions->save($permission);
 
-    return [
-      'ok' => $result['ok'] ?? false,
-      'error' => $result['error'] ?? null,
-      'permission' => $permission ? PermissionMapping::toDto($permission) : null,
-    ];
+    return PermissionDto::fromPermission($permission);
   }
 }

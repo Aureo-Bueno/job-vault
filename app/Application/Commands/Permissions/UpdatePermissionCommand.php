@@ -5,16 +5,16 @@ namespace App\Application\Commands\Permissions;
 use App\Application\Abstractions\Command;
 
 /**
- * Command to update a permission.
+ * Redefines a permission.
  */
 final class UpdatePermissionCommand implements Command
 {
   public function __construct(
-    public string $permissionId,
-    public string $name,
-    public string $description = '',
-    public string $module = '',
-    public string $action = ''
+    public readonly string $permissionId,
+    public readonly string $name,
+    public readonly string $description = '',
+    public readonly string $module = '',
+    public readonly string $action = ''
   ) {
   }
 }

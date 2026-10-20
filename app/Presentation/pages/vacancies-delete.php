@@ -1,49 +1,25 @@
 <?php
 
 /**
- * Vacancy deletion page controller.
- *
- * Access rules:
- * - authenticated user;
- * - requires `vacancy.delete` permission.
+ * Vacancy deletion confirmation.
  */
-
-require BASE_PATH . '/vendor/autoload.php';
 
 use App\Application\Commands\Vacancies\DeleteVacancyCommand;
 use App\Application\Exceptions\MessageValidationException;
 use App\Application\Exceptions\NotFoundException;
-use App\Application\Exceptions\OperationFailedException;
 use App\Application\Queries\Vacancies\GetVacancyByIdQuery;
 use App\Infrastructure\Container\AppContainer;
-use App\Presentation\Support\ExceptionHttpMapper;
+use App\Presentation\Support\Csrf;
 use App\Presentation\Support\HttpRedirect;
-use App\Presentation\View;
-use App\Util\Csrf;
-use App\Util\IdValidator;
-use App\Util\RoleManager;
+use App\Presentation\Support\Layout;
+use App\Presentation\Support\PageAccess;
 
-$authService = AppContainer::authService();
-$authService->requireLogin();
-$userId = $authService->getLoggedUser()['id'];
+$user = PageAccess::requireLogin();
+PageAccess::requirePermission($user, 'vacancy.delete');
 
-RoleManager::requirePermission($userId, 'vacancy.delete');
-
-$vacancyId = $_GET['id'] ?? null;
-if (!IdValidator::isValid($vacancyId)) {
-  $error = ExceptionHttpMapper::toPayload(new NotFoundException('Vaga não encontrada para exclusão.'));
-  HttpRedirect::to('index.php?r=home&status=' . $error['status'] . '&message=' . urlencode($error['message']));
-  exit;
-}
-
-$queryBus = AppContainer::queryBus();
-$commandBus = AppContainer::commandBus();
-$vacancy = $queryBus->ask(new GetVacancyByIdQuery((string) $vacancyId));
-
-if (!$vacancy) {
-  $error = ExceptionHttpMapper::toPayload(new NotFoundException('Vaga não encontrada para exclusão.'));
-  HttpRedirect::to('index.php?r=home&status=' . $error['status'] . '&message=' . urlencode($error['message']));
-  exit;
+$vacancy = AppContainer::queryBus()->ask(new GetVacancyByIdQuery((string) ($_GET['id'] ?? '')));
+if ($vacancy === null) {
+  HttpRedirect::withError('home', new NotFoundException('Vaga não encontrada para exclusão.'));
 }
 
 if (isset($_POST['excluir'])) {
@@ -52,23 +28,12 @@ if (isset($_POST['excluir'])) {
       throw new MessageValidationException('Não foi possível validar a requisição. Tente novamente.');
     }
 
-    $deleted = $commandBus->dispatch(new DeleteVacancyCommand((string) $vacancy->id));
-    if (!$deleted) {
-      throw new OperationFailedException('Não foi possível excluir a vaga.');
-    }
-
-    HttpRedirect::to('index.php?r=home&status=success');
+    AppContainer::commandBus()->dispatch(new DeleteVacancyCommand($vacancy->id));
   } catch (\Throwable $exception) {
-    $error = ExceptionHttpMapper::toPayload($exception);
-    HttpRedirect::to(
-      'index.php?r=home&status=' . urlencode($error['status']) .
-      '&message=' . urlencode($error['message'])
-    );
+    HttpRedirect::withError('home', $exception);
   }
+
+  HttpRedirect::withSuccess('home', 'Vaga excluída com sucesso.');
 }
 
-View::render(VIEW_PATH . '/layout/header.php');
-View::render(VIEW_PATH . '/pages/vacancy-delete-confirm.php', [
-  'vacancy' => $vacancy
-]);
-View::render(VIEW_PATH . '/layout/footer.php');
+Layout::page('/pages/vacancy-delete-confirm.php', ['vacancy' => $vacancy]);

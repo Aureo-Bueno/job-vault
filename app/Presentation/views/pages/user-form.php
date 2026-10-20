@@ -26,7 +26,7 @@ $senhaObrigatoria = $modo !== 'editar';
   <div class="card">
     <div class="card-body p-4 p-lg-5">
       <form method="POST" class="needs-validation" novalidate>
-        <?= \App\Util\Csrf::input() ?>
+        <?= \App\Presentation\Support\Csrf::input() ?>
 
         <div class="row g-4">
           <div class="col-12 col-lg-6">

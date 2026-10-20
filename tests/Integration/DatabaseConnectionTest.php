@@ -2,10 +2,10 @@
 
 namespace Tests\Integration;
 
-use App\Db\Database;
+use App\Infrastructure\Persistence\Database;
 use PHPUnit\Framework\TestCase;
 
-class DatabaseConnectionTest extends TestCase
+final class DatabaseConnectionTest extends TestCase
 {
   public function testDatabaseConnection(): void
   {
@@ -13,9 +13,6 @@ class DatabaseConnectionTest extends TestCase
       $this->markTestSkipped('Integration tests disabled. Set RUN_INTEGRATION=1 to enable.');
     }
 
-    $db = new Database('users');
-    $result = $db->select(null, null, '1');
-
-    $this->assertNotFalse($result);
+    $this->assertSame(1, (int) Database::fromEnvironment()->fetchValue('SELECT 1'));
   }
 }

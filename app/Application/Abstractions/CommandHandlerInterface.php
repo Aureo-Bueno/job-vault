@@ -16,6 +16,10 @@ interface CommandHandlerInterface
 
   /**
    * Handles command message.
+   *
+   * No native return type on purpose: handlers may declare `void` or a concrete DTO.
+   *
+   * @return mixed
    */
-  public function handle(Command $command): mixed;
+  public function handle(Command $command);
 }

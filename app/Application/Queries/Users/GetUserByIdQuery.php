@@ -5,11 +5,11 @@ namespace App\Application\Queries\Users;
 use App\Application\Abstractions\Query;
 
 /**
- * Query to get one user by identifier.
+ * Fetches a single user.
  */
 final class GetUserByIdQuery implements Query
 {
-  public function __construct(public string $userId)
+  public function __construct(public readonly string $userId)
   {
   }
 }

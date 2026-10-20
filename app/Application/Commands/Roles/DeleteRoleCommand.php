@@ -5,11 +5,11 @@ namespace App\Application\Commands\Roles;
 use App\Application\Abstractions\Command;
 
 /**
- * Command to delete a role.
+ * Removes a role that is not in use.
  */
 final class DeleteRoleCommand implements Command
 {
-  public function __construct(public string $roleId)
+  public function __construct(public readonly string $roleId)
   {
   }
 }

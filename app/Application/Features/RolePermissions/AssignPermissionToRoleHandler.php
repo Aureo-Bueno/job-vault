@@ -5,16 +5,17 @@ namespace App\Application\Features\RolePermissions;
 use App\Application\Abstractions\Command;
 use App\Application\Abstractions\CommandHandlerInterface;
 use App\Application\Commands\RolePermissions\AssignPermissionToRoleCommand;
-use App\Application\Service\AccessControlService;
+use App\Application\Features\Roles\AccessControlLookup;
+use App\Domain\Permission\PermissionRepositoryInterface;
+use App\Domain\Role\RoleRepositoryInterface;
 use InvalidArgumentException;
 
-/**
- * Handles role-permission assignment command.
- */
 final class AssignPermissionToRoleHandler implements CommandHandlerInterface
 {
-  public function __construct(private AccessControlService $accessControlService)
-  {
+  public function __construct(
+    private RoleRepositoryInterface $roles,
+    private PermissionRepositoryInterface $permissions
+  ) {
   }
 
   public function commandClass(): string
@@ -22,15 +23,16 @@ final class AssignPermissionToRoleHandler implements CommandHandlerInterface
     return AssignPermissionToRoleCommand::class;
   }
 
-  public function handle(Command $command): array
+  public function handle(Command $command): void
   {
     if (!$command instanceof AssignPermissionToRoleCommand) {
-      throw new InvalidArgumentException('Invalid command for AssignPermissionToRoleHandler.');
+      throw new InvalidArgumentException('Invalid command for ' . self::class);
     }
 
-    return $this->accessControlService->assignPermissionToRole(
-      $command->roleId,
-      $command->permissionId
-    );
+    $role = AccessControlLookup::role($this->roles, $command->roleId);
+    $permission = AccessControlLookup::permission($this->permissions, $command->permissionId);
+
+    $role->grant($permission->id());
+    $this->roles->save($role);
   }
 }

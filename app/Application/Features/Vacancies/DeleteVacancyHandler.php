@@ -5,15 +5,12 @@ namespace App\Application\Features\Vacancies;
 use App\Application\Abstractions\Command;
 use App\Application\Abstractions\CommandHandlerInterface;
 use App\Application\Commands\Vacancies\DeleteVacancyCommand;
-use App\Application\Service\VacancyService;
+use App\Domain\Vacancy\VacancyRepositoryInterface;
 use InvalidArgumentException;
 
-/**
- * Handles vacancy deletion command.
- */
 final class DeleteVacancyHandler implements CommandHandlerInterface
 {
-  public function __construct(private VacancyService $vacancyService)
+  public function __construct(private VacancyRepositoryInterface $vacancies)
   {
   }
 
@@ -22,12 +19,13 @@ final class DeleteVacancyHandler implements CommandHandlerInterface
     return DeleteVacancyCommand::class;
   }
 
-  public function handle(Command $command): bool
+  public function handle(Command $command): void
   {
     if (!$command instanceof DeleteVacancyCommand) {
-      throw new InvalidArgumentException('Invalid command for DeleteVacancyHandler.');
+      throw new InvalidArgumentException('Invalid command for ' . self::class);
     }
 
-    return $this->vacancyService->delete($command->vacancyId);
+    $vacancy = VacancyLoader::load($this->vacancies, $command->vacancyId);
+    $this->vacancies->remove($vacancy->id());
   }
 }

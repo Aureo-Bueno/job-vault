@@ -5,15 +5,10 @@
 <footer class="app-footer py-4">
   <div class="container-content">
     <div class="row g-2 align-items-center">
-      <div class="col-md-6">
+      <div class="col-12">
         <p class="text-muted small mb-0">
           <i class="bi bi-c-circle me-1"></i>
           <?= date('Y') ?> JobVault. Todos os direitos reservados.
-        </p>
-      </div>
-      <div class="col-md-6 text-md-end">
-        <p class="text-muted small mb-0">
-          Plataforma de vagas em PHP + Bootstrap 5
         </p>
       </div>
     </div>
@@ -65,14 +60,33 @@
     this.setAttribute('aria-label', 'Mostrar senha');
   });
 
+  // Client-side validation only highlights errors (red). We never paint fields green:
+  // "valid format" does not mean the server accepted the data (e.g. wrong password).
+  const markField = field => {
+    const invalid = !field.checkValidity();
+    field.classList.toggle('is-invalid', invalid);
+    field.closest('.input-group')?.classList.toggle('is-invalid', invalid);
+  };
+
   document.querySelectorAll('.needs-validation').forEach(form => {
+    const fields = form.querySelectorAll('input:not([type=hidden]), select, textarea');
+
     form.addEventListener('submit', function(e) {
+      fields.forEach(markField);
       if (!this.checkValidity()) {
         e.preventDefault();
         e.stopPropagation();
       }
-      this.classList.add('was-validated');
     }, false);
+
+    fields.forEach(field => {
+      const eventName = field.type === 'checkbox' || field.type === 'radio' ? 'change' : 'input';
+      field.addEventListener(eventName, () => {
+        if (field.classList.contains('is-invalid')) {
+          markField(field);
+        }
+      });
+    });
   });
 
   document.querySelectorAll('.alert[data-auto-close="true"]').forEach(alert => {

@@ -5,15 +5,15 @@ namespace App\Application\Commands\Vacancies;
 use App\Application\Abstractions\Command;
 
 /**
- * Command to update a vacancy.
+ * Revises a vacancy and sets its status.
  */
 final class UpdateVacancyCommand implements Command
 {
   public function __construct(
-    public string $vacancyId,
-    public string $title,
-    public string $description,
-    public string $isActive = 's'
+    public readonly string $vacancyId,
+    public readonly string $title,
+    public readonly string $description,
+    public readonly bool $active = true
   ) {
   }
 }

@@ -1,14 +1,11 @@
 <?php
 
 /**
- * Logout endpoint controller.
- *
- * Terminates the current session and redirects through AuthService.
+ * Ends the session and goes back to the login page.
  */
 
-require BASE_PATH . '/vendor/autoload.php';
-
 use App\Infrastructure\Container\AppContainer;
+use App\Presentation\Support\HttpRedirect;
 
-$authService = AppContainer::authService();
-$authService->logout();
+AppContainer::authService()->logout();
+HttpRedirect::route('login');

@@ -2,16 +2,25 @@
 
 namespace App\Application\DTOs;
 
-/**
- * Output DTO representing user data in application layer.
- */
+use App\Domain\User\User;
+
 final class UserDto
 {
   public function __construct(
-    public ?string $id,
-    public string $name,
-    public string $email,
-    public ?string $roleId
+    public readonly string $id,
+    public readonly string $name,
+    public readonly string $email,
+    public readonly ?string $roleId
   ) {
+  }
+
+  public static function fromUser(User $user): self
+  {
+    return new self(
+      $user->id()->value(),
+      $user->name()->value(),
+      $user->email()->value(),
+      $user->roleId()?->value()
+    );
   }
 }

@@ -5,11 +5,11 @@ namespace App\Application\Commands\Users;
 use App\Application\Abstractions\Command;
 
 /**
- * Command to delete a user account.
+ * Deletes a user. The logged user cannot delete itself.
  */
 final class DeleteUserCommand implements Command
 {
-  public function __construct(public string $userId)
+  public function __construct(public readonly string $userId)
   {
   }
 }

@@ -1,3 +1,7 @@
+<?php
+// Expecting: $alertaLogin, $alertaCadastro, $activeTab ('login'|'signup'), $loginEmail, $signupName, $signupEmail
+$isSignup = ($activeTab ?? 'login') === 'signup';
+?>
 <section class="container-content page-section py-3 py-lg-4">
   <div class="row justify-content-center align-items-stretch g-3 g-lg-4">
     <div class="col-12 col-lg-5">
@@ -25,36 +29,36 @@
           <ul class="nav nav-pills nav-fill gap-2 mb-4" role="tablist">
             <li class="nav-item" role="presentation">
               <button
-                class="nav-link active fw-bold"
+                class="nav-link fw-bold <?= $isSignup ? '' : 'active' ?>"
                 id="login-tab"
                 data-bs-toggle="pill"
                 data-bs-target="#login-form"
                 type="button"
                 role="tab"
                 aria-controls="login-form"
-                aria-selected="true">
+                aria-selected="<?= $isSignup ? 'false' : 'true' ?>">
                 <i class="bi bi-box-arrow-in-right"></i> Entrar
               </button>
             </li>
             <li class="nav-item" role="presentation">
               <button
-                class="nav-link fw-bold"
+                class="nav-link fw-bold <?= $isSignup ? 'active' : '' ?>"
                 id="signup-tab"
                 data-bs-toggle="pill"
                 data-bs-target="#signup-form"
                 type="button"
                 role="tab"
                 aria-controls="signup-form"
-                aria-selected="false">
+                aria-selected="<?= $isSignup ? 'true' : 'false' ?>">
                 <i class="bi bi-person-plus-fill"></i> Cadastro
               </button>
             </li>
           </ul>
 
           <div class="tab-content">
-            <div class="tab-pane fade show active" id="login-form" role="tabpanel" aria-labelledby="login-tab">
+            <div class="tab-pane fade <?= $isSignup ? '' : 'show active' ?>" id="login-form" role="tabpanel" aria-labelledby="login-tab">
               <?php if (!empty($alertaLogin)) : ?>
-                <div class="alert alert-danger alert-dismissible fade show" role="alert" data-auto-close="true">
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
                   <i class="bi bi-exclamation-circle-fill me-1"></i>
                   <?= htmlspecialchars($alertaLogin) ?>
                   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
@@ -63,7 +67,7 @@
 
               <form method="POST" action="" class="needs-validation" novalidate>
                 <input type="hidden" name="acao" value="logar">
-                <?= \App\Util\Csrf::input() ?>
+                <?= \App\Presentation\Support\Csrf::input() ?>
 
                 <div class="mb-3">
                   <label for="email-login" class="form-label"><i class="bi bi-envelope-fill"></i> E-mail</label>
@@ -72,6 +76,7 @@
                     class="form-control"
                     id="email-login"
                     name="email"
+                    value="<?= htmlspecialchars($loginEmail ?? '') ?>"
                     placeholder="seu@email.com"
                     autocomplete="email"
                     required>
@@ -109,9 +114,9 @@
               </form>
             </div>
 
-            <div class="tab-pane fade" id="signup-form" role="tabpanel" aria-labelledby="signup-tab">
+            <div class="tab-pane fade <?= $isSignup ? 'show active' : '' ?>" id="signup-form" role="tabpanel" aria-labelledby="signup-tab">
               <?php if (!empty($alertaCadastro)) : ?>
-                <div class="alert alert-danger alert-dismissible fade show" role="alert" data-auto-close="true">
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
                   <i class="bi bi-exclamation-circle-fill me-1"></i>
                   <?= htmlspecialchars($alertaCadastro) ?>
                   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
@@ -120,7 +125,7 @@
 
               <form method="POST" action="" class="needs-validation" novalidate>
                 <input type="hidden" name="acao" value="cadastrar">
-                <?= \App\Util\Csrf::input() ?>
+                <?= \App\Presentation\Support\Csrf::input() ?>
 
                 <div class="mb-3">
                   <label for="name-signup" class="form-label"><i class="bi bi-person-fill"></i> Nome completo</label>
@@ -129,6 +134,7 @@
                     class="form-control"
                     id="name-signup"
                     name="name"
+                    value="<?= htmlspecialchars($signupName ?? '') ?>"
                     placeholder="Seu nome"
                     autocomplete="name"
                     required>
@@ -142,6 +148,7 @@
                     class="form-control"
                     id="email-signup"
                     name="email"
+                    value="<?= htmlspecialchars($signupEmail ?? '') ?>"
                     placeholder="seu@email.com"
                     autocomplete="email"
                     required>

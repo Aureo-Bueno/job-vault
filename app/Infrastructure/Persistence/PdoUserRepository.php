@@ -2,179 +2,124 @@
 
 namespace App\Infrastructure\Persistence;
 
-use App\Db\Database;
-use App\Domain\Model\User;
-use App\Domain\Repository\UserRepositoryInterface;
-use App\Util\Logger;
-use App\Util\Uuid;
-use PDO;
+use App\Domain\Role\RoleId;
+use App\Domain\Shared\PageRequest;
+use App\Domain\User\EmailAddress;
+use App\Domain\User\PasswordHash;
+use App\Domain\User\PersonName;
+use App\Domain\User\User;
+use App\Domain\User\UserFilter;
+use App\Domain\User\UserId;
+use App\Domain\User\UserRepositoryInterface;
 
-class PdoUserRepository implements UserRepositoryInterface
+final class PdoUserRepository implements UserRepositoryInterface
 {
-  private Database $db;
-  private Logger $logger;
+  private const COLUMNS = 'id, name, email, password, role_id';
 
-  public function __construct()
+  public function __construct(private Database $db)
   {
-    $this->db = new Database('users');
-    $this->logger = new Logger('user');
   }
 
-  public function findByEmail(string $email): ?User
+  public function get(UserId $id): ?User
   {
-    try {
-      $result = $this->db->execute('SELECT * FROM users WHERE email = ?', [$email]);
-      $row = $result->fetch(PDO::FETCH_ASSOC);
-      return $row ? $this->mapRow($row) : null;
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to fetch user by email', [
-        'error' => $e->getMessage(),
-        'email' => $email
-      ]);
-      throw $e;
+    $row = $this->db->fetchOne('SELECT ' . self::COLUMNS . ' FROM users WHERE id = ?', [$id->value()]);
+    return $row ? $this->map($row) : null;
+  }
+
+  public function findByEmail(EmailAddress $email): ?User
+  {
+    $row = $this->db->fetchOne('SELECT ' . self::COLUMNS . ' FROM users WHERE email = ? LIMIT 1', [$email->value()]);
+    return $row ? $this->map($row) : null;
+  }
+
+  public function matching(UserFilter $filter, PageRequest $page): array
+  {
+    [$where, $params] = $this->criteria($filter);
+    $rows = $this->db->fetchAll(
+      'SELECT ' . self::COLUMNS . ' FROM users' . $where . ' ORDER BY name ASC, id ASC' . Sql::limit($page),
+      $params
+    );
+
+    return array_map([$this, 'map'], $rows);
+  }
+
+  public function countMatching(UserFilter $filter): int
+  {
+    [$where, $params] = $this->criteria($filter);
+    return (int) $this->db->fetchValue('SELECT COUNT(*) FROM users' . $where, $params);
+  }
+
+  public function countPerRole(): array
+  {
+    $rows = $this->db->fetchAll(
+      'SELECT role_id, COUNT(*) AS total FROM users WHERE role_id IS NOT NULL GROUP BY role_id'
+    );
+
+    $counts = [];
+    foreach ($rows as $row) {
+      $counts[(string) $row['role_id']] = (int) $row['total'];
     }
+
+    return $counts;
   }
 
-  public function findById(string $id): ?User
+  public function save(User $user): void
   {
-    try {
-      $result = $this->db->execute('SELECT * FROM users WHERE id = ?', [$id]);
-      $row = $result->fetch(PDO::FETCH_ASSOC);
-      return $row ? $this->mapRow($row) : null;
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to fetch user by id', [
-        'error' => $e->getMessage(),
-        'user_id' => $id
-      ]);
-      throw $e;
+    $values = [
+      $user->name()->value(),
+      $user->email()->value(),
+      $user->passwordHash()->value(),
+      $user->roleId()?->value(),
+      $user->id()->value(),
+    ];
+
+    $exists = $this->db->fetchValue('SELECT 1 FROM users WHERE id = ?', [$user->id()->value()]);
+    $this->db->run(
+      $exists
+        ? 'UPDATE users SET name = ?, email = ?, password = ?, role_id = ? WHERE id = ?'
+        : 'INSERT INTO users (name, email, password, role_id, id) VALUES (?, ?, ?, ?, ?)',
+      $values
+    );
+  }
+
+  public function remove(UserId $id): void
+  {
+    $this->db->run('DELETE FROM users WHERE id = ?', [$id->value()]);
+  }
+
+  /**
+   * @return array{0:string,1:array<string,string>}
+   */
+  private function criteria(UserFilter $filter): array
+  {
+    $conditions = [];
+    $params = [];
+
+    if ($filter->term !== null) {
+      $conditions[] = '(name LIKE :term_name OR email LIKE :term_email)';
+      $params['term_name'] = Sql::likePattern($filter->term);
+      $params['term_email'] = $params['term_name'];
     }
-  }
 
-  /** @return User[] */
-  public function findAll(
-    ?string $where = null,
-    ?string $order = null,
-    ?string $limit = null,
-    array $params = []
-  ): array
-  {
-    try {
-      $rows = $this->db->select($where, $order, $limit, '*', $params)->fetchAll(PDO::FETCH_ASSOC);
-      return array_map([$this, 'mapRow'], $rows);
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to fetch users', [
-        'error' => $e->getMessage(),
-        'where' => $where
-      ]);
-      throw $e;
+    if ($filter->roleId !== null) {
+      $conditions[] = 'role_id = :role_id';
+      $params['role_id'] = $filter->roleId->value();
     }
+
+    return [Sql::where($conditions), $params];
   }
 
-  public function count(?string $where = null, array $params = []): int
+  /**
+   * @param array<string,mixed> $row
+   */
+  private function map(array $row): User
   {
-    try {
-      return $this->db->count($where, $params);
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to count users', [
-        'error' => $e->getMessage()
-      ]);
-      throw $e;
-    }
-  }
-
-  public function create(User $user): ?string
-  {
-    try {
-      if ($user->roleId === null) {
-        $user->roleId = $this->getDefaultRoleId();
-      }
-
-      if ($user->id === null) {
-        $user->id = Uuid::generateV4();
-      }
-
-      $this->db->insert([
-        'id' => $user->id,
-        'name' => $user->name,
-        'email' => $user->email,
-        'password' => $user->password,
-        'role_id' => $user->roleId
-      ]);
-
-      return $user->id;
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to create user', [
-        'error' => $e->getMessage(),
-        'email' => $user->email
-      ]);
-      throw $e;
-    }
-  }
-
-  public function update(User $user): bool
-  {
-    try {
-      $values = [
-        'name' => $user->name,
-        'email' => $user->email,
-        'role_id' => $user->roleId
-      ];
-
-      if (!empty($user->password)) {
-        $values['password'] = $user->password;
-      }
-
-      $setClause = implode(' = ?, ', array_keys($values)) . ' = ?';
-      $params = array_values($values);
-      $params[] = $user->id;
-      $this->db->execute('UPDATE users SET ' . $setClause . ' WHERE id = ?', $params);
-      return true;
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to update user', [
-        'error' => $e->getMessage(),
-        'user_id' => $user->id
-      ]);
-      throw $e;
-    }
-  }
-
-  public function delete(string $id): bool
-  {
-    try {
-      $this->db->execute('DELETE FROM users WHERE id = ?', [$id]);
-      return true;
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to delete user', [
-        'error' => $e->getMessage(),
-        'user_id' => $id
-      ]);
-      throw $e;
-    }
-  }
-
-  public function getDefaultRoleId(): ?string
-  {
-    try {
-      $dbRoles = new Database('roles');
-      $result = $dbRoles->execute("SELECT id FROM roles WHERE name = 'usuario' LIMIT 1");
-      $row = $result->fetch(PDO::FETCH_ASSOC);
-      return $row ? (string) $row['id'] : null;
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to get default role', [
-        'error' => $e->getMessage()
-      ]);
-      throw $e;
-    }
-  }
-
-  private function mapRow(array $row): User
-  {
-    return new User(
-      isset($row['id']) ? (string) $row['id'] : null,
-      $row['name'] ?? '',
-      $row['email'] ?? '',
-      $row['password'] ?? '',
-      isset($row['role_id']) ? (string) $row['role_id'] : null
+    return User::reconstitute(
+      UserId::fromString((string) $row['id']),
+      PersonName::fromString((string) $row['name']),
+      EmailAddress::fromString((string) $row['email']),
+      PasswordHash::fromStored((string) $row['password']),
+      isset($row['role_id']) && $row['role_id'] !== '' ? RoleId::fromString((string) $row['role_id']) : null
     );
   }
 }

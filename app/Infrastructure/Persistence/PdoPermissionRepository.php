@@ -2,130 +2,94 @@
 
 namespace App\Infrastructure\Persistence;
 
-use App\Db\Database;
-use App\Domain\Model\Permission;
-use App\Domain\Repository\PermissionRepositoryInterface;
-use App\Util\Uuid;
-use PDO;
+use App\Domain\Permission\Permission;
+use App\Domain\Permission\PermissionId;
+use App\Domain\Permission\PermissionName;
+use App\Domain\Permission\PermissionRepositoryInterface;
+use App\Domain\Role\RoleId;
 
-/**
- * PDO implementation for permission persistence operations.
- */
-class PdoPermissionRepository implements PermissionRepositoryInterface
+final class PdoPermissionRepository implements PermissionRepositoryInterface
 {
-  private Database $db;
+  private const COLUMNS = 'id, name, description, module, action, created_at';
 
-  public function __construct()
+  public function __construct(private Database $db)
   {
-    $this->db = new Database('permissions');
   }
 
-  /**
-   * {@inheritDoc}
-   */
-  public function findById(string $id): ?Permission
+  public function get(PermissionId $id): ?Permission
   {
-    $result = $this->db->execute('SELECT * FROM permissions WHERE id = ?', [$id]);
-    $row = $result->fetch(PDO::FETCH_ASSOC);
-    return $row ? $this->mapRow($row) : null;
+    $row = $this->db->fetchOne('SELECT ' . self::COLUMNS . ' FROM permissions WHERE id = ?', [$id->value()]);
+    return $row ? $this->map($row) : null;
   }
 
-  /**
-   * {@inheritDoc}
-   */
-  public function findByName(string $name): ?Permission
+  public function findByName(PermissionName $name): ?Permission
   {
-    $result = $this->db->execute('SELECT * FROM permissions WHERE name = ? LIMIT 1', [$name]);
-    $row = $result->fetch(PDO::FETCH_ASSOC);
-    return $row ? $this->mapRow($row) : null;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @return Permission[]
-   */
-  public function findAll(): array
-  {
-    $rows = $this->db->select(null, 'module ASC, action ASC, name ASC')->fetchAll(PDO::FETCH_ASSOC);
-    return array_map([$this, 'mapRow'], $rows);
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @return Permission[]
-   */
-  public function findByModule(string $module): array
-  {
-    $result = $this->db->execute('SELECT * FROM permissions WHERE module = ? ORDER BY action ASC', [$module]);
-    $rows = $result->fetchAll(PDO::FETCH_ASSOC);
-    return array_map([$this, 'mapRow'], $rows);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  public function create(Permission $permission): ?string
-  {
-    if ($permission->id === null) {
-      $permission->id = Uuid::generateV4();
-    }
-
-    $this->db->insert([
-      'id' => $permission->id,
-      'name' => $permission->name,
-      'description' => $permission->description,
-      'module' => $permission->module,
-      'action' => $permission->action
-    ]);
-
-    return $permission->id;
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  public function update(Permission $permission): bool
-  {
-    if ($permission->id === null) {
-      return false;
-    }
-
-    $this->db->execute(
-      'UPDATE permissions SET name = ?, description = ?, module = ?, action = ? WHERE id = ?',
-      [
-        $permission->name,
-        $permission->description,
-        $permission->module,
-        $permission->action,
-        $permission->id
-      ]
+    $row = $this->db->fetchOne(
+      'SELECT ' . self::COLUMNS . ' FROM permissions WHERE name = ? LIMIT 1',
+      [$name->value()]
     );
-    return true;
+    return $row ? $this->map($row) : null;
+  }
+
+  public function all(): array
+  {
+    $rows = $this->db->fetchAll('SELECT ' . self::COLUMNS . ' FROM permissions ORDER BY module ASC, action ASC, name ASC');
+    return array_map([$this, 'map'], $rows);
+  }
+
+  public function namesGrantedToRole(RoleId $roleId): array
+  {
+    $rows = $this->db->fetchAll(
+      'SELECT p.name FROM permissions p
+       JOIN role_permissions rp ON rp.permission_id = p.id
+       WHERE rp.role_id = ?',
+      [$roleId->value()]
+    );
+
+    return array_map(static fn (array $row): string => (string) $row['name'], $rows);
+  }
+
+  public function save(Permission $permission): void
+  {
+    $id = $permission->id()->value();
+    $values = [
+      $permission->name()->value(),
+      $permission->description(),
+      $permission->module(),
+      $permission->action(),
+    ];
+
+    if ($this->db->fetchValue('SELECT 1 FROM permissions WHERE id = ?', [$id])) {
+      $this->db->run(
+        'UPDATE permissions SET name = ?, description = ?, module = ?, action = ? WHERE id = ?',
+        [...$values, $id]
+      );
+      return;
+    }
+
+    $this->db->run(
+      'INSERT INTO permissions (name, description, module, action, id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      [...$values, $id, Sql::fromDate($permission->createdAt())]
+    );
+  }
+
+  public function remove(PermissionId $id): void
+  {
+    $this->db->run('DELETE FROM permissions WHERE id = ?', [$id->value()]);
   }
 
   /**
-   * {@inheritDoc}
+   * @param array<string,mixed> $row
    */
-  public function delete(string $id): bool
+  private function map(array $row): Permission
   {
-    $this->db->execute('DELETE FROM permissions WHERE id = ?', [$id]);
-    return true;
-  }
-
-  /**
-   * Maps a database row into a Permission model instance.
-   */
-  private function mapRow(array $row): Permission
-  {
-    return new Permission(
-      isset($row['id']) ? (string) $row['id'] : null,
-      $row['name'] ?? '',
-      $row['description'] ?? '',
-      $row['module'] ?? '',
-      $row['action'] ?? '',
-      $row['created_at'] ?? ''
+    return Permission::reconstitute(
+      PermissionId::fromString((string) $row['id']),
+      PermissionName::fromString((string) $row['name']),
+      (string) ($row['description'] ?? ''),
+      (string) ($row['module'] ?? ''),
+      (string) ($row['action'] ?? ''),
+      Sql::toDate($row['created_at'] ?? null)
     );
   }
 }

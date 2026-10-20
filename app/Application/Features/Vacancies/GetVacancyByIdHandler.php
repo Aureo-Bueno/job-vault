@@ -5,17 +5,14 @@ namespace App\Application\Features\Vacancies;
 use App\Application\Abstractions\Query;
 use App\Application\Abstractions\QueryHandlerInterface;
 use App\Application\DTOs\VacancyDto;
-use App\Application\Mappings\VacancyMapping;
 use App\Application\Queries\Vacancies\GetVacancyByIdQuery;
-use App\Application\Service\VacancyService;
+use App\Domain\Vacancy\VacancyId;
+use App\Domain\Vacancy\VacancyRepositoryInterface;
 use InvalidArgumentException;
 
-/**
- * Handles vacancy retrieval by identifier query.
- */
 final class GetVacancyByIdHandler implements QueryHandlerInterface
 {
-  public function __construct(private VacancyService $vacancyService)
+  public function __construct(private VacancyRepositoryInterface $vacancies)
   {
   }
 
@@ -27,11 +24,14 @@ final class GetVacancyByIdHandler implements QueryHandlerInterface
   public function handle(Query $query): ?VacancyDto
   {
     if (!$query instanceof GetVacancyByIdQuery) {
-      throw new InvalidArgumentException('Invalid query for GetVacancyByIdHandler.');
+      throw new InvalidArgumentException('Invalid query for ' . self::class);
     }
 
-    $vacancy = $this->vacancyService->getById($query->vacancyId);
+    if (!VacancyId::isValid($query->vacancyId)) {
+      return null;
+    }
 
-    return $vacancy ? VacancyMapping::toDto($vacancy) : null;
+    $vacancy = $this->vacancies->get(VacancyId::fromString($query->vacancyId));
+    return $vacancy ? VacancyDto::fromVacancy($vacancy) : null;
   }
 }

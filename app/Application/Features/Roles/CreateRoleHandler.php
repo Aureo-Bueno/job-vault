@@ -5,16 +5,16 @@ namespace App\Application\Features\Roles;
 use App\Application\Abstractions\Command;
 use App\Application\Abstractions\CommandHandlerInterface;
 use App\Application\Commands\Roles\CreateRoleCommand;
-use App\Application\Mappings\RoleMapping;
-use App\Application\Service\AccessControlService;
+use App\Application\DTOs\RoleDto;
+use App\Domain\Role\Role;
+use App\Domain\Role\RoleId;
+use App\Domain\Role\RoleName;
+use App\Domain\Role\RoleRepositoryInterface;
 use InvalidArgumentException;
 
-/**
- * Handles role creation command.
- */
 final class CreateRoleHandler implements CommandHandlerInterface
 {
-  public function __construct(private AccessControlService $accessControlService)
+  public function __construct(private RoleRepositoryInterface $roles)
   {
   }
 
@@ -23,19 +23,18 @@ final class CreateRoleHandler implements CommandHandlerInterface
     return CreateRoleCommand::class;
   }
 
-  public function handle(Command $command): array
+  public function handle(Command $command): RoleDto
   {
     if (!$command instanceof CreateRoleCommand) {
-      throw new InvalidArgumentException('Invalid command for CreateRoleHandler.');
+      throw new InvalidArgumentException('Invalid command for ' . self::class);
     }
 
-    $result = $this->accessControlService->createRole($command->name, $command->description);
-    $role = $result['role'] ?? null;
+    $name = RoleName::fromString($command->name);
+    AccessControlLookup::ensureRoleNameIsAvailable($this->roles, $name);
 
-    return [
-      'ok' => $result['ok'] ?? false,
-      'error' => $result['error'] ?? null,
-      'role' => $role ? RoleMapping::toDto($role) : null,
-    ];
+    $role = Role::create(RoleId::generate(), $name, $command->description);
+    $this->roles->save($role);
+
+    return RoleDto::fromRole($role);
   }
 }

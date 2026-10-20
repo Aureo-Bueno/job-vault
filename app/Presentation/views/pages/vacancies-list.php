@@ -42,8 +42,8 @@
           <label for="status_filter" class="form-label"><i class="bi bi-funnel-fill"></i> Status</label>
           <select name="status_filter" id="status_filter" class="form-select">
             <option value="">Todos</option>
-            <option value="s" <?= $statusFilter === 's' ? 'selected' : '' ?>>Ativo</option>
-            <option value="n" <?= $statusFilter === 'n' ? 'selected' : '' ?>>Inativo</option>
+            <option value="active" <?= $statusFilter === 'active' ? 'selected' : '' ?>>Ativo</option>
+            <option value="inactive" <?= $statusFilter === 'inactive' ? 'selected' : '' ?>>Inativo</option>
           </select>
         </div>
 
@@ -79,7 +79,7 @@
           <?php else : ?>
             <?php foreach ($vacancies as $index => $vacancy) : ?>
               <?php
-              $statusAtivo = ($vacancy->isActive ?? 'n') === 's';
+              $statusAtivo = $vacancy->isActive;
               $badgeClass = $statusAtivo ? 'bg-success' : 'bg-secondary';
               $statusText = $statusAtivo ? 'Ativo' : 'Inativo';
               $descricaoCurta = trim((string) ($vacancy->description ?? ''));

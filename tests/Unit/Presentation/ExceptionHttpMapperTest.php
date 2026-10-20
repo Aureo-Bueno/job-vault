@@ -2,16 +2,18 @@
 
 namespace Tests\Unit\Presentation;
 
-use App\Application\Exceptions\MessageAuthorizationException;
+use App\Application\Exceptions\ForbiddenException;
 use App\Application\Exceptions\MessageValidationException;
 use App\Application\Exceptions\NotFoundException;
 use App\Application\Exceptions\OperationFailedException;
-use App\Db\Exceptions\DatabaseConnectionException;
-use App\Db\Exceptions\DatabaseQueryException;
+use App\Domain\JobApplication\AlreadyAppliedException;
+use App\Domain\Vacancy\VacancyNotOpenException;
+use App\Infrastructure\Persistence\Exceptions\DatabaseConnectionException;
+use App\Infrastructure\Persistence\Exceptions\DatabaseQueryException;
 use App\Presentation\Support\ExceptionHttpMapper;
 use PHPUnit\Framework\TestCase;
 
-class ExceptionHttpMapperTest extends TestCase
+final class ExceptionHttpMapperTest extends TestCase
 {
   public function testMapsNotFoundTo404PayloadAndAlert(): void
   {
@@ -30,35 +32,47 @@ class ExceptionHttpMapperTest extends TestCase
   public function testMapsValidationAndAuthorizationToExpectedHttpCodes(): void
   {
     $validation = ExceptionHttpMapper::toPayload(new MessageValidationException('Entrada inválida.'));
-    $authorization = ExceptionHttpMapper::toPayload(new MessageAuthorizationException('Acesso negado.'));
+    $authorization = ExceptionHttpMapper::toPayload(new ForbiddenException('Acesso negado.'));
 
     $this->assertSame(422, $validation['httpCode']);
     $this->assertSame('validation_error', $validation['status']);
-    $this->assertSame('Entrada inválida.', $validation['message']);
-
     $this->assertSame(403, $authorization['httpCode']);
     $this->assertSame('forbidden', $authorization['status']);
     $this->assertSame('Acesso negado.', $authorization['message']);
   }
 
-  public function testMapsDatabaseExceptionsToDbErrorStatus(): void
+  public function testMapsDomainExceptions(): void
   {
-    $connection = ExceptionHttpMapper::toPayload(new DatabaseConnectionException('Down.'));
-    $query = ExceptionHttpMapper::toPayload(new DatabaseQueryException('Query failed.'));
+    $rule = ExceptionHttpMapper::toPayload(new VacancyNotOpenException());
+    $conflict = ExceptionHttpMapper::toPayload(new AlreadyAppliedException());
+
+    $this->assertSame(422, $rule['httpCode']);
+    $this->assertSame('validation_error', $rule['status']);
+    $this->assertSame(409, $conflict['httpCode']);
+    $this->assertSame('conflict', $conflict['status']);
+    $this->assertSame('Você já se candidatou a esta vaga.', $conflict['message']);
+  }
+
+  public function testMapsDatabaseExceptionsWithoutLeakingDetails(): void
+  {
+    $connection = ExceptionHttpMapper::toPayload(new DatabaseConnectionException('SQLSTATE secret'));
+    $query = ExceptionHttpMapper::toPayload(new DatabaseQueryException('SQLSTATE secret'));
 
     $this->assertSame(503, $connection['httpCode']);
     $this->assertSame('db_error', $connection['status']);
-
+    $this->assertStringNotContainsString('SQLSTATE', $connection['message']);
     $this->assertSame(500, $query['httpCode']);
-    $this->assertSame('db_error', $query['status']);
+    $this->assertTrue(ExceptionHttpMapper::isUnexpected(new DatabaseQueryException()));
   }
 
-  public function testMapsOperationFailedExceptionToServerErrorWithMessage(): void
+  public function testMapsOperationFailedAndUnknownToServerError(): void
   {
-    $payload = ExceptionHttpMapper::toPayload(new OperationFailedException('Não foi possível concluir a operação.'));
+    $failed = ExceptionHttpMapper::toPayload(new OperationFailedException('Não foi possível concluir a operação.'));
+    $unknown = ExceptionHttpMapper::toPayload(new \RuntimeException('boom'));
 
-    $this->assertSame(500, $payload['httpCode']);
-    $this->assertSame('server_error', $payload['status']);
-    $this->assertSame('Não foi possível concluir a operação.', $payload['message']);
+    $this->assertSame('server_error', $failed['status']);
+    $this->assertSame('Não foi possível concluir a operação.', $failed['message']);
+    $this->assertSame(500, $unknown['httpCode']);
+    $this->assertStringNotContainsString('boom', $unknown['message']);
   }
 }

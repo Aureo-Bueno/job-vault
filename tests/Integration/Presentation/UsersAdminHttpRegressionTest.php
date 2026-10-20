@@ -2,191 +2,147 @@
 
 namespace Tests\Integration\Presentation;
 
+use App\Application\Abstractions\SimpleCommandBus;
+use App\Application\Behaviors\AuthorizationBehavior;
 use App\Application\Commands\Users\CreateUserCommand;
+use App\Application\Commands\Users\DeleteUserCommand;
 use App\Application\DTOs\UserDto;
-use App\Application\Queries\Users\GetUserByEmailQuery;
+use App\Application\Security\AuthenticatedUser;
+use App\Application\Security\MessageAuthorizer;
 use App\Infrastructure\Container\AppContainer;
-use App\Util\Csrf;
+use App\Presentation\Support\Csrf;
+use App\Presentation\Support\RedirectSignal;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
-use Tests\Support\FakeAuthService;
-use Tests\Support\FakeCommandBus;
-use Tests\Support\FakeQueryBus;
-use Tests\Support\FakeRoleService;
+use Tests\Support\FakeAuthorization;
+use Tests\Support\FakeCurrentUser;
+use Tests\Support\InMemorySession;
+use Tests\Support\RecordingHandler;
 
 /**
+ * Drives app/Presentation/pages/users-index.php with a real authorization pipeline
+ * and fake handlers/persistence.
+ *
  * @runTestsInSeparateProcesses
  * @preserveGlobalState disabled
  */
-class UsersAdminHttpRegressionTest extends TestCase
+final class UsersAdminHttpRegressionTest extends TestCase
 {
+  private RecordingHandler $createHandler;
+  private RecordingHandler $deleteHandler;
+
   protected function setUp(): void
   {
     AppContainer::reset();
     putenv('APP_TEST_MODE=1');
 
-    if (!defined('BASE_PATH')) {
-      define('BASE_PATH', dirname(__DIR__, 3));
-    }
-
-    if (!defined('VIEW_PATH')) {
-      define('VIEW_PATH', BASE_PATH . '/app/Presentation/views');
-    }
-
-    if (session_status() !== PHP_SESSION_ACTIVE) {
-      session_start();
-    }
+    defined('BASE_PATH') || define('BASE_PATH', dirname(__DIR__, 3));
+    defined('VIEW_PATH') || define('VIEW_PATH', BASE_PATH . '/app/Presentation/views');
 
     $_GET = [];
     $_POST = [];
-    $_SERVER = [];
-    $_SESSION = [];
+    $_SERVER = ['REQUEST_METHOD' => 'POST'];
   }
 
   protected function tearDown(): void
   {
     AppContainer::reset();
     putenv('APP_TEST_MODE');
-
-    if (session_status() === PHP_SESSION_ACTIVE) {
-      $_SESSION = [];
-      session_destroy();
-    }
   }
 
-  public function testUsersActionRejectsInvalidCsrf(): void
+  public function testRejectsInvalidCsrf(): void
   {
-    $this->bootstrapUsersRoute(
-      ['user.create'],
-      [
-        'action' => 'user_create',
-        'name' => 'Ana',
-        'email' => 'ana@example.com',
-        'password' => '123456',
-        'csrf_token' => 'invalid-token',
-      ]
-    );
+    $this->bootstrap(['user.create'], ['action' => 'user_create', 'csrf_token' => 'invalid-token']);
 
-    $location = $this->executeUsersRoute();
-    $query = $this->parseRedirectQuery($location);
+    $query = $this->dispatchRoute();
 
     $this->assertSame('users', $query['r'] ?? null);
-    $this->assertSame('error', $query['status'] ?? null);
-    $this->assertStringContainsString('Falha na validação da requisição', (string) ($query['message'] ?? ''));
+    $this->assertSame('validation_error', $query['status'] ?? null);
+    $this->assertStringContainsString('Falha na validação da requisição', $query['message'] ?? '');
+    $this->assertSame([], $this->createHandler->handled);
   }
 
-  public function testUsersActionRejectsMissingPermissionForDelete(): void
+  public function testBusRejectsMissingPermissionForDelete(): void
   {
-    $csrfToken = $this->bootstrapUsersRoute(
-      ['user.list'],
-      [
-        'action' => 'user_delete',
-        'user_id' => '123',
-      ]
-    );
+    $this->bootstrap(['user.list'], ['action' => 'user_delete', 'user_id' => '123']);
 
-    $_POST['csrf_token'] = $csrfToken;
+    $query = $this->dispatchRoute();
 
-    $location = $this->executeUsersRoute();
-    $query = $this->parseRedirectQuery($location);
-
-    $this->assertSame('error', $query['status'] ?? null);
-    $this->assertStringContainsString('não tem permissão para excluir usuários', (string) ($query['message'] ?? ''));
+    $this->assertSame('forbidden', $query['status'] ?? null);
+    $this->assertStringContainsString('user.delete', $query['message'] ?? '');
+    $this->assertSame([], $this->deleteHandler->handled);
   }
 
-  public function testUsersActionCreatesUserWhenPermissionAndCsrfAreValid(): void
+  public function testCreatesUserWhenPermissionAndCsrfAreValid(): void
   {
-    $recordedCommands = [];
-    $csrfToken = $this->bootstrapUsersRoute(
-      ['user.create'],
-      [
-        'action' => 'user_create',
-        'name' => 'Bea',
-        'email' => 'bea@example.com',
-        'password' => '123456',
-      ],
-      $recordedCommands
-    );
+    $this->bootstrap(['user.create'], [
+      'action' => 'user_create',
+      'name' => 'Bea',
+      'email' => 'bea@example.com',
+      'password' => '123456',
+      'role_id' => 'ignored-without-assign-role',
+    ]);
 
-    $_POST['csrf_token'] = $csrfToken;
-
-    $location = $this->executeUsersRoute();
-    $query = $this->parseRedirectQuery($location);
+    $query = $this->dispatchRoute();
 
     $this->assertSame('success', $query['status'] ?? null);
-    $this->assertStringContainsString('Usuário criado com sucesso', (string) ($query['message'] ?? ''));
-    $this->assertCount(1, $recordedCommands);
-    $this->assertInstanceOf(CreateUserCommand::class, $recordedCommands[0]);
-    $this->assertSame('bea@example.com', $recordedCommands[0]->email);
+    $this->assertStringContainsString('Usuário criado com sucesso', $query['message'] ?? '');
+    $this->assertCount(1, $this->createHandler->handled);
+    $command = $this->createHandler->handled[0];
+    $this->assertInstanceOf(CreateUserCommand::class, $command);
+    $this->assertSame('bea@example.com', $command->email);
+    $this->assertNull($command->roleId, 'role is only sent when the admin can assign roles');
+  }
+
+  public function testUnknownActionIsRejected(): void
+  {
+    $this->bootstrap(['user.create'], ['action' => 'drop_database']);
+
+    $this->assertSame('Ação inválida.', $this->dispatchRoute()['message'] ?? null);
   }
 
   /**
    * @param string[] $permissions
-   * @param array<string,mixed> $postData
-   * @param array<int,object> $recordedCommands
+   * @param array<string,string> $post
    */
-  private function bootstrapUsersRoute(array $permissions, array $postData, array &$recordedCommands = []): string
+  private function bootstrap(array $permissions, array $post): void
   {
-    $_SERVER['REQUEST_METHOD'] = 'POST';
-    $_GET = [];
-    $_POST = $postData;
+    $session = new InMemorySession();
+    $session->set('user', ['id' => '1', 'name' => 'Admin', 'email' => 'admin@example.com']);
+    AppContainer::setOverride('session', $session);
 
-    $_SESSION['user'] = [
-      'id' => '1',
-      'name' => 'Admin',
-      'email' => 'admin@example.com',
-      'role_id' => 'admin-role',
-    ];
+    $authorization = new FakeAuthorization($permissions, true);
+    AppContainer::setOverride('authorization', $authorization);
 
-    $csrfToken = Csrf::token();
+    $this->createHandler = new RecordingHandler(
+      CreateUserCommand::class,
+      new UserDto('10', 'Bea', 'bea@example.com', null)
+    );
+    $this->deleteHandler = new RecordingHandler(DeleteUserCommand::class);
 
-    AppContainer::setOverride('authService', new FakeAuthService(true, $_SESSION['user']));
-    AppContainer::setOverride('roleService', new FakeRoleService($permissions, true, false));
+    $authorizer = new MessageAuthorizer(
+      new FakeCurrentUser(new AuthenticatedUser('1', 'Admin', 'admin@example.com')),
+      $authorization
+    );
+    AppContainer::setOverride('commandBus', new SimpleCommandBus(
+      [$this->createHandler, $this->deleteHandler],
+      [new AuthorizationBehavior([$authorizer, 'authorize'])]
+    ));
 
-    AppContainer::setOverride('queryBus', new FakeQueryBus(function ($query) {
-      if ($query instanceof GetUserByEmailQuery) {
-        return null;
-      }
-
-      return [];
-    }));
-
-    AppContainer::setOverride('commandBus', new FakeCommandBus(function ($command) use (&$recordedCommands) {
-      $recordedCommands[] = $command;
-
-      if ($command instanceof CreateUserCommand) {
-        return new UserDto('10', $command->name, $command->email, $command->roleId);
-      }
-
-      return true;
-    }));
-
-    return $csrfToken;
-  }
-
-  private function executeUsersRoute(): string
-  {
-    try {
-      require BASE_PATH . '/app/Presentation/pages/users-index.php';
-    } catch (RuntimeException $exception) {
-      if (str_starts_with($exception->getMessage(), 'REDIRECT:')) {
-        return substr($exception->getMessage(), strlen('REDIRECT:'));
-      }
-
-      throw $exception;
-    }
-
-    $this->fail('Expected HTTP redirect in users-index route.');
+    $_POST = $post + ['csrf_token' => Csrf::token()];
   }
 
   /**
    * @return array<string,string>
    */
-  private function parseRedirectQuery(string $location): array
+  private function dispatchRoute(): array
   {
-    $query = parse_url($location, PHP_URL_QUERY);
-    $output = [];
-    parse_str((string) $query, $output);
-    return $output;
+    try {
+      require BASE_PATH . '/app/Presentation/pages/users-index.php';
+    } catch (RedirectSignal $redirect) {
+      parse_str((string) parse_url($redirect->location, PHP_URL_QUERY), $query);
+      return $query;
+    }
+
+    $this->fail('Expected an HTTP redirect from users-index.php');
   }
 }

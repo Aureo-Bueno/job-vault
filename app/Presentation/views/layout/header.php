@@ -1,35 +1,16 @@
 <?php
-
-use App\Infrastructure\Container\AppContainer;
-use App\Util\RoleManager;
-
-$authService = AppContainer::authService();
-$loggedUser = $authService->getLoggedUser();
-$userId = $loggedUser['id'] ?? null;
-$canViewUsers = $userId
-  ? (RoleManager::isAdmin($userId) && RoleManager::hasPermission($userId, 'user.list'))
-  : false;
-$canCreateVacancy = $userId ? RoleManager::hasPermission($userId, 'vacancy.create') : false;
-$canManageVacancies = $userId ? (RoleManager::isAdmin($userId) || RoleManager::isManager($userId)) : false;
-$homeRoute = $loggedUser && !$canManageVacancies ? 'vacancies/apply' : 'home';
-$currentRoute = $_GET['r'] ?? 'home';
-$role = null;
-
-if ($loggedUser) {
-  $role = RoleManager::getUserRole($loggedUser['id']);
-  $roleName = $role ? $role->name : 'Sem role';
-
-  $badgeClass = match ($roleName) {
-    'admin' => 'bg-danger',
-    'gestor' => 'bg-warning text-dark',
-    'usuario' => 'bg-success',
-    default => 'bg-secondary'
-  };
-} else {
-  $roleName = 'Visitante';
-  $badgeClass = 'bg-secondary';
-}
-
+/**
+ * Layout header. Data provided by App\Presentation\Support\Layout:
+ * @var \App\Application\Security\AuthenticatedUser|null $loggedUser
+ * @var string $roleName
+ * @var string $badgeClass
+ * @var bool $hasRole
+ * @var bool $canViewUsers
+ * @var bool $canCreateVacancy
+ * @var bool $canManageVacancies
+ * @var string $homeRoute
+ * @var string $currentRoute
+ */
 $homeActive = $currentRoute === $homeRoute || ($homeRoute === 'home' && $currentRoute === '');
 $vacanciesActive = str_starts_with($currentRoute, 'vacancies') && $currentRoute !== 'vacancies/apply';
 $applyActive = $currentRoute === 'vacancies/apply';
@@ -683,13 +664,13 @@ $usersActive = str_starts_with($currentRoute, 'users');
             <?php if ($loggedUser) : ?>
               <div class="user-info">
                 <div class="user-avatar">
-                  <?= htmlspecialchars(substr($loggedUser['name'], 0, 1)) ?>
+                  <?= htmlspecialchars($loggedUser->initial()) ?>
                 </div>
                 <div>
-                  <div class="text-white fw-semibold small lh-1 mb-1"><?= htmlspecialchars($loggedUser['name']) ?></div>
+                  <div class="text-white fw-semibold small lh-1 mb-1"><?= htmlspecialchars($loggedUser->name) ?></div>
                   <span class="role-badge <?= htmlspecialchars($badgeClass) ?>">
                     <i class="bi bi-shield-fill"></i>
-                    <?= htmlspecialchars(strtoupper($roleName)) ?>
+                    <?= htmlspecialchars(mb_strtoupper($roleName)) ?>
                   </span>
                 </div>
                 <a href="index.php?r=logout" class="btn btn-logout" aria-label="Sair da sessão">
@@ -715,10 +696,10 @@ $usersActive = str_starts_with($currentRoute, 'users');
             <h1 class="brand-font"><i class="bi bi-briefcase"></i> Gestão de vagas sem ruído</h1>
             <p>Painel central para cadastro, publicação e acompanhamento de candidaturas.</p>
           </div>
-          <?php if ($loggedUser && $role) : ?>
+          <?php if ($loggedUser && $hasRole) : ?>
             <span class="hero-chip">
               <i class="bi bi-person-badge-fill"></i>
-              Perfil: <?= htmlspecialchars(strtoupper($roleName)) ?>
+              Perfil: <?= htmlspecialchars(mb_strtoupper($roleName)) ?>
             </span>
           <?php endif; ?>
         </div>

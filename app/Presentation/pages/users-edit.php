@@ -1,150 +1,70 @@
 <?php
 
 /**
- * User edition page controller.
- *
- * Access rules:
- * - authenticated admin only;
- * - requires `user.edit` permission.
+ * Standalone user edition form (admin).
  */
 
-require BASE_PATH . '/vendor/autoload.php';
-
-use App\Application\Abstractions\CommandBusInterface;
-use App\Application\Abstractions\QueryBusInterface;
 use App\Application\Commands\Users\UpdateUserCommand;
-use App\Application\Exceptions\ForbiddenException;
-use App\Application\Queries\Roles\ListRolesQuery;
-use App\Application\Queries\Users\GetUserByEmailQuery;
-use App\Application\Queries\Users\GetUserByIdQuery;
+use App\Application\Exceptions\MessageValidationException;
 use App\Application\Exceptions\NotFoundException;
+use App\Application\Queries\Roles\ListRolesQuery;
+use App\Application\Queries\Users\GetUserByIdQuery;
+use App\Application\Security\MessageAuthorizer;
 use App\Infrastructure\Container\AppContainer;
+use App\Presentation\Support\Csrf;
 use App\Presentation\Support\ExceptionHttpMapper;
 use App\Presentation\Support\HttpRedirect;
-use App\Presentation\View;
-use App\Util\Csrf;
-use App\Util\IdValidator;
-use App\Util\RoleManager;
+use App\Presentation\Support\Layout;
+use App\Presentation\Support\PageAccess;
 
-$authService = AppContainer::authService();
-$authService->requireLogin();
-$loggedUser = $authService->getLoggedUser();
-$loggedUserId = $loggedUser['id'];
+$loggedUser = PageAccess::requireLogin();
+PageAccess::requireAdmin($loggedUser);
+PageAccess::requirePermission($loggedUser, 'user.edit');
 
-if (!RoleManager::isAdmin($loggedUserId)) {
-  $error = ExceptionHttpMapper::toPayload(new ForbiddenException('Acesso restrito ao perfil administrador.'));
-  HttpRedirect::to('index.php?r=vacancies/apply&status=' . $error['status'] . '&message=' . urlencode($error['message']));
+$found = AppContainer::queryBus()->ask(new GetUserByIdQuery((string) ($_GET['id'] ?? '')));
+if ($found === null) {
+  HttpRedirect::withError('users', new NotFoundException('Usuário não encontrado para edição.'));
 }
 
-try {
-  RoleManager::requirePermission($loggedUserId, 'user.edit');
-} catch (\Throwable $exception) {
-  $error = ExceptionHttpMapper::toPayload($exception);
-  HttpRedirect::to('index.php?r=vacancies/apply&status=' . $error['status'] . '&message=' . urlencode($error['message']));
-}
-
-$targetUserId = $_GET['id'] ?? null;
-if (!IdValidator::isValid($targetUserId)) {
-  $error = ExceptionHttpMapper::toPayload(new NotFoundException('Usuário não encontrado para edição.'));
-  HttpRedirect::to('index.php?r=users&status=' . $error['status'] . '&message=' . urlencode($error['message']));
-}
-
-$commandBus = AppContainer::commandBus();
-$queryBus = AppContainer::queryBus();
-
-$user = $queryBus->ask(new GetUserByIdQuery((string) $targetUserId));
-if (!$user) {
-  $error = ExceptionHttpMapper::toPayload(new NotFoundException('Usuário não encontrado para edição.'));
-  HttpRedirect::to('index.php?r=users&status=' . $error['status'] . '&message=' . urlencode($error['message']));
-}
-
-$pageTitle = 'Editar Usuário';
+$canAssignRole = PageAccess::can($loggedUser, MessageAuthorizer::ASSIGN_ROLE);
+$user = (object) ['id' => $found->id, 'name' => $found->name, 'email' => $found->email, 'roleId' => $found->roleId];
 $alerta = null;
 
-$canAssignRole = RoleManager::hasPermission($loggedUserId, 'user.assign_role');
-$roles = $canAssignRole ? $queryBus->ask(new ListRolesQuery()) : [];
-
-if (isset($_POST['name'], $_POST['email'])) {
-  $isValidCsrfRequest = Csrf::validateFromRequest();
-  if (!$isValidCsrfRequest) {
-    $alerta = [
-      'tipo' => 'danger',
-      'icone' => 'bi bi-exclamation-circle-fill',
-      'mensagem' => 'Não foi possível validar a requisição. Tente novamente.'
-    ];
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+  $user->name = trim((string) ($_POST['name'] ?? ''));
+  $user->email = trim((string) ($_POST['email'] ?? ''));
+  if ($canAssignRole) {
+    $user->roleId = ($_POST['role_id'] ?? '') === '' ? null : (string) $_POST['role_id'];
   }
 
-  if ($isValidCsrfRequest) {
-    $alerta = processUserUpdate($commandBus, $queryBus, $user, $canAssignRole);
+  try {
+    if (!Csrf::validateFromRequest()) {
+      throw new MessageValidationException('Não foi possível validar a requisição. Tente novamente.');
+    }
+
+    $password = (string) ($_POST['password'] ?? '');
+    AppContainer::commandBus()->dispatch(new UpdateUserCommand(
+      $user->id,
+      $user->name,
+      $user->email,
+      $password === '' ? null : $password,
+      $user->roleId,
+      $canAssignRole
+    ));
+  } catch (\Throwable $exception) {
+    $alerta = ExceptionHttpMapper::toAlert($exception);
+  }
+
+  if ($alerta === null) {
+    HttpRedirect::withSuccess('users', 'Usuário atualizado com sucesso.');
   }
 }
 
-View::render(VIEW_PATH . '/layout/header.php');
-View::render(VIEW_PATH . '/pages/user-form.php', [
+Layout::page('/pages/user-form.php', [
   'user' => $user,
-  'roles' => $roles,
+  'roles' => $canAssignRole ? AppContainer::queryBus()->ask(new ListRolesQuery()) : [],
   'canAssignRole' => $canAssignRole,
   'modo' => 'editar',
-  'tituloPagina' => $pageTitle,
-  'alerta' => $alerta
+  'tituloPagina' => 'Editar Usuário',
+  'alerta' => $alerta,
 ]);
-View::render(VIEW_PATH . '/layout/footer.php');
-
-/**
- * Validates and persists user edition payload.
- *
- * @return array{tipo:string,icone:string,mensagem:string}|null
- */
-function processUserUpdate(
-  CommandBusInterface $commandBus,
-  QueryBusInterface $queryBus,
-  object $user,
-  bool $canAssignRole
-): ?array {
-  try {
-    $name = trim((string) ($_POST['name'] ?? ''));
-    $email = trim((string) ($_POST['email'] ?? ''));
-
-    $emailOwner = $queryBus->ask(new GetUserByEmailQuery($email));
-    if ($emailOwner && $emailOwner->id !== $user->id) {
-      return [
-        'tipo' => 'danger',
-        'icone' => 'bi bi-exclamation-circle-fill',
-        'mensagem' => 'Outro usuário já utiliza esse e-mail.'
-      ];
-    }
-
-    $roleId = $user->roleId ?? null;
-    if ($canAssignRole) {
-      $postedRoleId = (string) ($_POST['role_id'] ?? '');
-      if ($postedRoleId === '') {
-        $roleId = null;
-      } elseif (IdValidator::isValid($postedRoleId)) {
-        $roleId = $postedRoleId;
-      }
-    }
-
-    $password = trim((string) ($_POST['password'] ?? ''));
-    $passwordForUpdate = $password === '' ? null : $password;
-
-    $updated = $commandBus->dispatch(new UpdateUserCommand(
-      (string) ($user->id ?? ''),
-      $name,
-      $email,
-      $passwordForUpdate,
-      $roleId
-    ));
-
-    if ($updated) {
-      HttpRedirect::to('index.php?r=users&status=success');
-    }
-
-    return [
-      'tipo' => 'danger',
-      'icone' => 'bi bi-exclamation-circle-fill',
-      'mensagem' => 'Não foi possível atualizar o usuário.'
-    ];
-  } catch (\Throwable $exception) {
-    return ExceptionHttpMapper::toAlert($exception);
-  }
-}

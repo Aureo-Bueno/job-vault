@@ -2,31 +2,34 @@
 
 namespace App\Application\Behaviors;
 
+use App\Application\Ports\LoggerInterface;
+use Throwable;
+
 /**
- * Logs message lifecycle around the next pipeline step.
+ * Logs message lifecycle (including failures) around the next pipeline step.
  */
 final class LoggingBehavior implements BehaviorInterface
 {
-  /**
-   * @var callable(string,array<string,mixed>):void
-   */
-  private $logger;
-
-  /**
-   * @param callable(string,array<string,mixed>):void $logger
-   */
-  public function __construct(callable $logger)
+  public function __construct(private LoggerInterface $logger)
   {
-    $this->logger = $logger;
   }
 
   public function handle(object $message, callable $next): mixed
   {
-    ($this->logger)('pipeline.started', ['message' => $message::class]);
+    $context = ['message' => $message::class];
+    $this->logger->info('pipeline.started', $context);
 
-    $result = $next($message);
+    try {
+      $result = $next($message);
+    } catch (Throwable $exception) {
+      $this->logger->warning('pipeline.failed', $context + [
+        'exception' => $exception::class,
+        'error' => $exception->getMessage(),
+      ]);
+      throw $exception;
+    }
 
-    ($this->logger)('pipeline.finished', ['message' => $message::class]);
+    $this->logger->info('pipeline.finished', $context);
 
     return $result;
   }

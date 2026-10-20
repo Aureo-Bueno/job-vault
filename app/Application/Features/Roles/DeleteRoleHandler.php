@@ -5,16 +5,17 @@ namespace App\Application\Features\Roles;
 use App\Application\Abstractions\Command;
 use App\Application\Abstractions\CommandHandlerInterface;
 use App\Application\Commands\Roles\DeleteRoleCommand;
-use App\Application\Service\AccessControlService;
+use App\Domain\Role\RoleRepositoryInterface;
+use App\Domain\User\UserFilter;
+use App\Domain\User\UserRepositoryInterface;
 use InvalidArgumentException;
 
-/**
- * Handles role deletion command.
- */
 final class DeleteRoleHandler implements CommandHandlerInterface
 {
-  public function __construct(private AccessControlService $accessControlService)
-  {
+  public function __construct(
+    private RoleRepositoryInterface $roles,
+    private UserRepositoryInterface $users
+  ) {
   }
 
   public function commandClass(): string
@@ -22,12 +23,15 @@ final class DeleteRoleHandler implements CommandHandlerInterface
     return DeleteRoleCommand::class;
   }
 
-  public function handle(Command $command): array
+  public function handle(Command $command): void
   {
     if (!$command instanceof DeleteRoleCommand) {
-      throw new InvalidArgumentException('Invalid command for DeleteRoleHandler.');
+      throw new InvalidArgumentException('Invalid command for ' . self::class);
     }
 
-    return $this->accessControlService->deleteRole($command->roleId);
+    $role = AccessControlLookup::role($this->roles, $command->roleId);
+    $role->ensureCanBeDeleted($this->users->countMatching(new UserFilter(null, $role->id())));
+
+    $this->roles->remove($role->id());
   }
 }

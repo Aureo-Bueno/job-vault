@@ -15,10 +15,10 @@ final class StatusAlertMapper
       'icone' => 'bi bi-exclamation-circle-fill',
       'mensagem' => 'Não foi possível executar ação!',
     ],
-    'exists' => [
+    'conflict' => [
       'tipo' => 'info',
       'icone' => 'bi bi-info-circle-fill',
-      'mensagem' => 'Você já se candidatou a esta vaga.',
+      'mensagem' => 'O registro informado já existe.',
     ],
     'not_found' => [
       'tipo' => 'warning',
@@ -59,5 +59,20 @@ final class StatusAlertMapper
     }
 
     return self::ALERTS[$status] ?? null;
+  }
+
+  /**
+   * Alert built from `?status=...&message=...` after a redirect.
+   */
+  public static function fromRequest(): ?array
+  {
+    $alert = self::from(is_string($_GET['status'] ?? null) ? $_GET['status'] : null);
+    $message = trim((string) ($_GET['message'] ?? ''));
+
+    if ($alert !== null && $message !== '') {
+      $alert['mensagem'] = $message;
+    }
+
+    return $alert;
   }
 }

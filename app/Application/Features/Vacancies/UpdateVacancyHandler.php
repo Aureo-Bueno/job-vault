@@ -5,15 +5,15 @@ namespace App\Application\Features\Vacancies;
 use App\Application\Abstractions\Command;
 use App\Application\Abstractions\CommandHandlerInterface;
 use App\Application\Commands\Vacancies\UpdateVacancyCommand;
-use App\Application\Service\VacancyService;
+use App\Domain\Vacancy\VacancyDescription;
+use App\Domain\Vacancy\VacancyRepositoryInterface;
+use App\Domain\Vacancy\VacancyStatus;
+use App\Domain\Vacancy\VacancyTitle;
 use InvalidArgumentException;
 
-/**
- * Handles vacancy update command.
- */
 final class UpdateVacancyHandler implements CommandHandlerInterface
 {
-  public function __construct(private VacancyService $vacancyService)
+  public function __construct(private VacancyRepositoryInterface $vacancies)
   {
   }
 
@@ -22,21 +22,19 @@ final class UpdateVacancyHandler implements CommandHandlerInterface
     return UpdateVacancyCommand::class;
   }
 
-  public function handle(Command $command): bool
+  public function handle(Command $command): void
   {
     if (!$command instanceof UpdateVacancyCommand) {
-      throw new InvalidArgumentException('Invalid command for UpdateVacancyHandler.');
+      throw new InvalidArgumentException('Invalid command for ' . self::class);
     }
 
-    $vacancy = $this->vacancyService->getById($command->vacancyId);
-    if (!$vacancy) {
-      return false;
-    }
+    $vacancy = VacancyLoader::load($this->vacancies, $command->vacancyId);
+    $vacancy->revise(
+      VacancyTitle::fromString($command->title),
+      VacancyDescription::fromString($command->description)
+    );
+    $vacancy->changeStatus(VacancyStatus::fromBool($command->active));
 
-    $vacancy->title = $command->title;
-    $vacancy->description = $command->description;
-    $vacancy->isActive = $command->isActive;
-
-    return $this->vacancyService->update($vacancy);
+    $this->vacancies->save($vacancy);
   }
 }

@@ -2,108 +2,109 @@
 
 namespace App\Infrastructure\Persistence;
 
-use App\Db\Database;
-use App\Domain\Model\Role;
-use App\Domain\Repository\RoleRepositoryInterface;
-use App\Util\Uuid;
-use PDO;
+use App\Domain\Permission\PermissionId;
+use App\Domain\Role\Role;
+use App\Domain\Role\RoleId;
+use App\Domain\Role\RoleName;
+use App\Domain\Role\RoleRepositoryInterface;
 
 /**
- * PDO implementation for role persistence operations.
+ * Persists the Role aggregate: `roles` row + its `role_permissions` grants.
  */
-class PdoRoleRepository implements RoleRepositoryInterface
+final class PdoRoleRepository implements RoleRepositoryInterface
 {
-  private Database $db;
+  private const COLUMNS = 'id, name, description, created_at';
 
-  public function __construct()
+  public function __construct(private Database $db)
   {
-    $this->db = new Database('roles');
   }
 
-  /**
-   * {@inheritDoc}
-   */
-  public function findById(string $id): ?Role
+  public function get(RoleId $id): ?Role
   {
-    $result = $this->db->execute('SELECT * FROM roles WHERE id = ?', [$id]);
-    $row = $result->fetch(PDO::FETCH_ASSOC);
-    return $row ? $this->mapRow($row) : null;
+    $row = $this->db->fetchOne('SELECT ' . self::COLUMNS . ' FROM roles WHERE id = ?', [$id->value()]);
+    return $row ? $this->map($row, $this->grantsOf($id->value())) : null;
   }
 
-  /**
-   * {@inheritDoc}
-   */
-  public function findByName(string $name): ?Role
+  public function findByName(RoleName $name): ?Role
   {
-    $result = $this->db->execute('SELECT * FROM roles WHERE name = ? LIMIT 1', [$name]);
-    $row = $result->fetch(PDO::FETCH_ASSOC);
-    return $row ? $this->mapRow($row) : null;
+    $row = $this->db->fetchOne('SELECT ' . self::COLUMNS . ' FROM roles WHERE name = ? LIMIT 1', [$name->value()]);
+    return $row ? $this->map($row, $this->grantsOf((string) $row['id'])) : null;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @return Role[]
-   */
-  public function findAll(): array
+  public function all(): array
   {
-    $rows = $this->db->select(null, 'name ASC')->fetchAll(PDO::FETCH_ASSOC);
-    return array_map([$this, 'mapRow'], $rows);
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  public function create(Role $role): ?string
-  {
-    if ($role->id === null) {
-      $role->id = Uuid::generateV4();
+    $grants = [];
+    foreach ($this->db->fetchAll('SELECT role_id, permission_id FROM role_permissions') as $grant) {
+      $grants[(string) $grant['role_id']][] = (string) $grant['permission_id'];
     }
 
-    $this->db->insert([
-      'id' => $role->id,
-      'name' => $role->name,
-      'description' => $role->description
-    ]);
-
-    return $role->id;
+    $rows = $this->db->fetchAll('SELECT ' . self::COLUMNS . ' FROM roles ORDER BY name ASC');
+    return array_map(fn (array $row): Role => $this->map($row, $grants[(string) $row['id']] ?? []), $rows);
   }
 
-  /**
-   * {@inheritDoc}
-   */
-  public function update(Role $role): bool
+  public function save(Role $role): void
   {
-    if ($role->id === null) {
-      return false;
+    $id = $role->id()->value();
+    $exists = $this->db->fetchValue('SELECT 1 FROM roles WHERE id = ?', [$id]);
+
+    if ($exists) {
+      $this->db->run('UPDATE roles SET name = ?, description = ? WHERE id = ?', [
+        $role->name()->value(),
+        $role->description(),
+        $id,
+      ]);
+    } else {
+      $this->db->run('INSERT INTO roles (id, name, description, created_at) VALUES (?, ?, ?, ?)', [
+        $id,
+        $role->name()->value(),
+        $role->description(),
+        Sql::fromDate($role->createdAt()),
+      ]);
     }
 
-    $this->db->execute(
-      'UPDATE roles SET name = ?, description = ? WHERE id = ?',
-      [$role->name, $role->description, $role->id]
-    );
-    return true;
+    $this->syncGrants($id, array_map(static fn (PermissionId $p): string => $p->value(), $role->permissionIds()));
+  }
+
+  public function remove(RoleId $id): void
+  {
+    $this->db->run('DELETE FROM roles WHERE id = ?', [$id->value()]);
   }
 
   /**
-   * {@inheritDoc}
+   * @param string[] $wanted
    */
-  public function delete(string $id): bool
+  private function syncGrants(string $roleId, array $wanted): void
   {
-    $this->db->execute('DELETE FROM roles WHERE id = ?', [$id]);
-    return true;
+    $current = $this->grantsOf($roleId);
+
+    foreach (array_diff($current, $wanted) as $permissionId) {
+      $this->db->run('DELETE FROM role_permissions WHERE role_id = ? AND permission_id = ?', [$roleId, $permissionId]);
+    }
+
+    foreach (array_diff($wanted, $current) as $permissionId) {
+      $this->db->run('INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)', [$roleId, $permissionId]);
+    }
+  }
+
+  /** @return string[] */
+  private function grantsOf(string $roleId): array
+  {
+    $rows = $this->db->fetchAll('SELECT permission_id FROM role_permissions WHERE role_id = ?', [$roleId]);
+    return array_map(static fn (array $row): string => (string) $row['permission_id'], $rows);
   }
 
   /**
-   * Maps a database row into a Role model instance.
+   * @param array<string,mixed> $row
+   * @param string[] $permissionIds
    */
-  private function mapRow(array $row): Role
+  private function map(array $row, array $permissionIds): Role
   {
-    return new Role(
-      isset($row['id']) ? (string) $row['id'] : null,
-      $row['name'] ?? '',
-      $row['description'] ?? '',
-      $row['created_at'] ?? ''
+    return Role::reconstitute(
+      RoleId::fromString((string) $row['id']),
+      RoleName::fromString((string) $row['name']),
+      (string) ($row['description'] ?? ''),
+      Sql::toDate($row['created_at'] ?? null),
+      array_map([PermissionId::class, 'fromString'], $permissionIds)
     );
   }
 }

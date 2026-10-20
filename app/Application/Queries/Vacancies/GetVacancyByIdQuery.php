@@ -5,11 +5,11 @@ namespace App\Application\Queries\Vacancies;
 use App\Application\Abstractions\Query;
 
 /**
- * Query to get one vacancy by identifier.
+ * Fetches a single vacancy.
  */
 final class GetVacancyByIdQuery implements Query
 {
-  public function __construct(public string $vacancyId)
+  public function __construct(public readonly string $vacancyId)
   {
   }
 }

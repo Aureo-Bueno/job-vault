@@ -5,15 +5,13 @@ namespace App\Application\Features\Permissions;
 use App\Application\Abstractions\Command;
 use App\Application\Abstractions\CommandHandlerInterface;
 use App\Application\Commands\Permissions\DeletePermissionCommand;
-use App\Application\Service\AccessControlService;
+use App\Application\Features\Roles\AccessControlLookup;
+use App\Domain\Permission\PermissionRepositoryInterface;
 use InvalidArgumentException;
 
-/**
- * Handles permission deletion command.
- */
 final class DeletePermissionHandler implements CommandHandlerInterface
 {
-  public function __construct(private AccessControlService $accessControlService)
+  public function __construct(private PermissionRepositoryInterface $permissions)
   {
   }
 
@@ -22,12 +20,13 @@ final class DeletePermissionHandler implements CommandHandlerInterface
     return DeletePermissionCommand::class;
   }
 
-  public function handle(Command $command): array
+  public function handle(Command $command): void
   {
     if (!$command instanceof DeletePermissionCommand) {
-      throw new InvalidArgumentException('Invalid command for DeletePermissionHandler.');
+      throw new InvalidArgumentException('Invalid command for ' . self::class);
     }
 
-    return $this->accessControlService->deletePermission($command->permissionId);
+    $permission = AccessControlLookup::permission($this->permissions, $command->permissionId);
+    $this->permissions->remove($permission->id());
   }
 }

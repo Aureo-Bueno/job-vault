@@ -6,17 +6,12 @@ use App\Application\Abstractions\Command;
 use App\Application\Abstractions\CommandHandlerInterface;
 use App\Application\Commands\Users\CreateUserCommand;
 use App\Application\DTOs\UserDto;
-use App\Application\Mappings\UserMapping;
-use App\Application\Service\UserService;
-use App\Domain\Model\User;
+use App\Application\Users\UserRegistrar;
 use InvalidArgumentException;
 
-/**
- * Handles user creation command.
- */
 final class CreateUserHandler implements CommandHandlerInterface
 {
-  public function __construct(private UserService $userService)
+  public function __construct(private UserRegistrar $registrar)
   {
   }
 
@@ -25,19 +20,14 @@ final class CreateUserHandler implements CommandHandlerInterface
     return CreateUserCommand::class;
   }
 
-  public function handle(Command $command): ?UserDto
+  public function handle(Command $command): UserDto
   {
     if (!$command instanceof CreateUserCommand) {
-      throw new InvalidArgumentException('Invalid command for CreateUserHandler.');
+      throw new InvalidArgumentException('Invalid command for ' . self::class);
     }
 
-    $user = new User();
-    $user->name = $command->name;
-    $user->email = $command->email;
-    $user->roleId = $command->roleId;
+    $user = $this->registrar->register($command->name, $command->email, $command->password, $command->roleId);
 
-    $created = $this->userService->create($user, $command->password);
-
-    return $created ? UserMapping::toDto($created) : null;
+    return UserDto::fromUser($user);
   }
 }

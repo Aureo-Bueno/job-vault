@@ -92,7 +92,7 @@ $buildUrl = static function (array $extra = []) use ($baseQuery): string {
         <div class="card-body">
           <h4 class="h6 text-white mb-3"><i class="bi bi-person-plus-fill"></i> Criar usuário</h4>
           <form method="POST" class="row g-3">
-            <?= \App\Util\Csrf::input() ?>
+            <?= \App\Presentation\Support\Csrf::input() ?>
             <input type="hidden" name="action" value="user_create">
 
             <div class="col-12 col-lg-3">
@@ -141,7 +141,7 @@ $buildUrl = static function (array $extra = []) use ($baseQuery): string {
           </div>
 
           <form method="POST" class="row g-3">
-            <?= \App\Util\Csrf::input() ?>
+            <?= \App\Presentation\Support\Csrf::input() ?>
             <input type="hidden" name="action" value="user_update">
             <input type="hidden" name="user_id" value="<?= htmlspecialchars((string) ($editingUser->id ?? '')) ?>">
 
@@ -232,7 +232,7 @@ $buildUrl = static function (array $extra = []) use ($baseQuery): string {
 
                       <?php if ($canDeleteUsers && !$isCurrentUser) : ?>
                         <form method="POST" class="d-inline">
-                          <?= \App\Util\Csrf::input() ?>
+                          <?= \App\Presentation\Support\Csrf::input() ?>
                           <input type="hidden" name="action" value="user_delete">
                           <input type="hidden" name="user_id" value="<?= htmlspecialchars($userId) ?>">
                           <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Confirma a exclusão deste usuário?');">
@@ -307,7 +307,7 @@ $buildUrl = static function (array $extra = []) use ($baseQuery): string {
         <div class="card-body">
           <h4 class="h6 text-white mb-3"><i class="bi bi-plus-square-fill"></i> Criar role</h4>
           <form method="POST" class="row g-3">
-            <?= \App\Util\Csrf::input() ?>
+            <?= \App\Presentation\Support\Csrf::input() ?>
             <input type="hidden" name="action" value="role_create">
 
             <div class="col-12 col-lg-4">
@@ -339,7 +339,7 @@ $buildUrl = static function (array $extra = []) use ($baseQuery): string {
           </div>
 
           <form method="POST" class="row g-3">
-            <?= \App\Util\Csrf::input() ?>
+            <?= \App\Presentation\Support\Csrf::input() ?>
             <input type="hidden" name="action" value="role_update">
             <input type="hidden" name="role_id" value="<?= htmlspecialchars((string) ($editingRole->id ?? '')) ?>">
 
@@ -394,7 +394,7 @@ $buildUrl = static function (array $extra = []) use ($baseQuery): string {
                 <tr>
                   <td>
                     <strong><?= htmlspecialchars($role->name ?? '') ?></strong>
-                    <?php if (($role->name ?? '') === 'admin') : ?>
+                    <?php if ($role->isSystem) : ?>
                       <span class="badge status-badge bg-info text-dark ms-1">Sistema</span>
                     <?php endif; ?>
                   </td>
@@ -411,7 +411,7 @@ $buildUrl = static function (array $extra = []) use ($baseQuery): string {
                           </span>
                           <?php if ($canAssignPermissionToRole && $permission->id) : ?>
                             <form method="POST" class="d-inline">
-                              <?= \App\Util\Csrf::input() ?>
+                              <?= \App\Presentation\Support\Csrf::input() ?>
                               <input type="hidden" name="action" value="role_permission_remove">
                               <input type="hidden" name="role_id" value="<?= htmlspecialchars($roleId) ?>">
                               <input type="hidden" name="permission_id" value="<?= htmlspecialchars((string) $permission->id) ?>">
@@ -426,7 +426,7 @@ $buildUrl = static function (array $extra = []) use ($baseQuery): string {
 
                     <?php if ($canAssignPermissionToRole && !empty($permissions)) : ?>
                       <form method="POST" class="d-flex gap-2 mt-2">
-                        <?= \App\Util\Csrf::input() ?>
+                        <?= \App\Presentation\Support\Csrf::input() ?>
                         <input type="hidden" name="action" value="role_permission_assign">
                         <input type="hidden" name="role_id" value="<?= htmlspecialchars($roleId) ?>">
                         <select name="permission_id" class="form-select form-select-sm" required>
@@ -457,7 +457,7 @@ $buildUrl = static function (array $extra = []) use ($baseQuery): string {
 
                       <?php if ($canDeleteRoles) : ?>
                         <form method="POST" class="d-inline">
-                          <?= \App\Util\Csrf::input() ?>
+                          <?= \App\Presentation\Support\Csrf::input() ?>
                           <input type="hidden" name="action" value="role_delete">
                           <input type="hidden" name="role_id" value="<?= htmlspecialchars($roleId) ?>">
                           <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Confirma a exclusão desta role?');">
@@ -530,7 +530,7 @@ $buildUrl = static function (array $extra = []) use ($baseQuery): string {
         <div class="card-body">
           <h4 class="h6 text-white mb-3"><i class="bi bi-plus-square-fill"></i> Criar permissão</h4>
           <form method="POST" class="row g-3">
-            <?= \App\Util\Csrf::input() ?>
+            <?= \App\Presentation\Support\Csrf::input() ?>
             <input type="hidden" name="action" value="permission_create">
 
             <div class="col-12 col-lg-3">
@@ -572,7 +572,7 @@ $buildUrl = static function (array $extra = []) use ($baseQuery): string {
           </div>
 
           <form method="POST" class="row g-3">
-            <?= \App\Util\Csrf::input() ?>
+            <?= \App\Presentation\Support\Csrf::input() ?>
             <input type="hidden" name="action" value="permission_update">
             <input type="hidden" name="permission_id" value="<?= htmlspecialchars((string) ($editingPermission->id ?? '')) ?>">
 
@@ -646,7 +646,7 @@ $buildUrl = static function (array $extra = []) use ($baseQuery): string {
 
                       <?php if ($canDeletePermissions) : ?>
                         <form method="POST" class="d-inline">
-                          <?= \App\Util\Csrf::input() ?>
+                          <?= \App\Presentation\Support\Csrf::input() ?>
                           <input type="hidden" name="action" value="permission_delete">
                           <input type="hidden" name="permission_id" value="<?= htmlspecialchars($permissionId) ?>">
                           <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Confirma a exclusão desta permissão?');">

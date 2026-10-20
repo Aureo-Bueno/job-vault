@@ -57,7 +57,7 @@
                       </span>
                     <?php else : ?>
                       <form method="POST" class="d-inline">
-                        <?= \App\Util\Csrf::input() ?>
+                        <?= \App\Presentation\Support\Csrf::input() ?>
                         <input type="hidden" name="vacancy_id" value="<?= htmlspecialchars($vacancyId) ?>">
                         <button type="submit" class="btn btn-success btn-sm">
                           <i class="bi bi-send"></i> Candidatar

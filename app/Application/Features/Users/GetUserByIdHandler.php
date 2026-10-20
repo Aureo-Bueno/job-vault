@@ -5,17 +5,14 @@ namespace App\Application\Features\Users;
 use App\Application\Abstractions\Query;
 use App\Application\Abstractions\QueryHandlerInterface;
 use App\Application\DTOs\UserDto;
-use App\Application\Mappings\UserMapping;
 use App\Application\Queries\Users\GetUserByIdQuery;
-use App\Application\Service\UserService;
+use App\Domain\User\UserId;
+use App\Domain\User\UserRepositoryInterface;
 use InvalidArgumentException;
 
-/**
- * Handles user retrieval by identifier query.
- */
 final class GetUserByIdHandler implements QueryHandlerInterface
 {
-  public function __construct(private UserService $userService)
+  public function __construct(private UserRepositoryInterface $users)
   {
   }
 
@@ -27,11 +24,14 @@ final class GetUserByIdHandler implements QueryHandlerInterface
   public function handle(Query $query): ?UserDto
   {
     if (!$query instanceof GetUserByIdQuery) {
-      throw new InvalidArgumentException('Invalid query for GetUserByIdHandler.');
+      throw new InvalidArgumentException('Invalid query for ' . self::class);
     }
 
-    $user = $this->userService->getById($query->userId);
+    if (!UserId::isValid($query->userId)) {
+      return null;
+    }
 
-    return $user ? UserMapping::toDto($user) : null;
+    $user = $this->users->get(UserId::fromString($query->userId));
+    return $user ? UserDto::fromUser($user) : null;
   }
 }

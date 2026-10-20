@@ -1,97 +1,67 @@
 <?php
 
 /**
- * Authentication page controller.
- *
- * Responsibilities:
- * - renders login/registration form for guests;
- * - validates CSRF token for submitted actions;
- * - dispatches login and registration handlers.
+ * Login / sign-up page (guests only).
  */
-
-require BASE_PATH . '/vendor/autoload.php';
 
 use App\Infrastructure\Container\AppContainer;
-use App\Presentation\View;
-use App\Util\Csrf;
+use App\Presentation\Support\Csrf;
+use App\Presentation\Support\ExceptionHttpMapper;
+use App\Presentation\Support\HttpRedirect;
+use App\Presentation\Support\Layout;
+use App\Presentation\Support\PageAccess;
 
-$alertaLogin = '';
-$alertaCadastro = '';
+PageAccess::requireGuest();
 
 $authService = AppContainer::authService();
-$authService->requireLogout();
-
+$alertaLogin = '';
+$alertaCadastro = '';
 $action = (string) ($_POST['acao'] ?? '');
-if ($action !== '') {
-  $isValidCsrfRequest = Csrf::validateFromRequest();
 
-  if (!$isValidCsrfRequest) {
-    $invalidCsrfMessage = 'Não foi possível validar a requisição. Tente novamente.';
-    if ($action === 'cadastrar') {
-      $alertaCadastro = $invalidCsrfMessage;
-    }
-    if ($action !== 'cadastrar') {
-      $alertaLogin = $invalidCsrfMessage;
-    }
+if ($action !== '' && !Csrf::validateFromRequest()) {
+  $invalidCsrf = 'Não foi possível validar a requisição. Tente novamente.';
+  if ($action === 'cadastrar') {
+    $alertaCadastro = $invalidCsrf;
+  } else {
+    $alertaLogin = $invalidCsrf;
+  }
+  $action = '';
+}
+
+if ($action === 'logar') {
+  $user = $authService->authenticate((string) ($_POST['email'] ?? ''), (string) ($_POST['password'] ?? ''));
+  if ($user !== null) {
+    $authService->login($user);
+    HttpRedirect::route('home');
   }
 
-  if ($isValidCsrfRequest && $action === 'logar') {
-    $alertaLogin = handleLogin($authService);
+  $alertaLogin = 'Email ou Senha Inválidos';
+}
+
+if ($action === 'cadastrar') {
+  $registered = null;
+
+  try {
+    $registered = $authService->register(
+      (string) ($_POST['name'] ?? ''),
+      (string) ($_POST['email'] ?? ''),
+      (string) ($_POST['password'] ?? '')
+    );
+  } catch (\Throwable $exception) {
+    $alertaCadastro = ExceptionHttpMapper::toPayload($exception)['message'];
   }
 
-  if ($isValidCsrfRequest && $action === 'cadastrar') {
-    $alertaCadastro = handleRegister($authService);
+  if ($registered !== null) {
+    $authService->login($registered);
+    HttpRedirect::route('home');
   }
 }
 
-View::render(VIEW_PATH . '/layout/header.php');
-View::render(VIEW_PATH . '/pages/auth-form.php', [
+Layout::page('/pages/auth-form.php', [
   'alertaLogin' => $alertaLogin,
-  'alertaCadastro' => $alertaCadastro
+  'alertaCadastro' => $alertaCadastro,
+  'activeTab' => $alertaCadastro !== '' ? 'signup' : 'login',
+  'loginEmail' => $action === 'logar' ? trim((string) ($_POST['email'] ?? '')) : '',
+  'signupName' => $action === 'cadastrar' ? trim((string) ($_POST['name'] ?? '')) : '',
+  'signupEmail' => $action === 'cadastrar' ? trim((string) ($_POST['email'] ?? '')) : '',
 ]);
-View::render(VIEW_PATH . '/layout/footer.php');
-
-/**
- * Executes login flow using submitted credentials.
- *
- * @return string Error message when authentication fails, empty string otherwise.
- */
-function handleLogin(\App\Application\Service\AuthService $authService): string
-{
-  $email = (string) ($_POST['email'] ?? '');
-  $password = (string) ($_POST['password'] ?? '');
-
-  $authenticatedUser = $authService->authenticate($email, $password);
-  if (!$authenticatedUser) {
-    return 'Email ou Senha Inválidos';
-  }
-
-  $authService->login($authenticatedUser);
-  return '';
-}
-
-/**
- * Executes registration flow for submitted user data.
- *
- * @return string Error message when registration fails, empty string otherwise.
- */
-function handleRegister(\App\Application\Service\AuthService $authService): string
-{
-  if (!isset($_POST['name'], $_POST['email'], $_POST['password'])) {
-    return 'Preencha os campos obrigatórios.';
-  }
-
-  $registerResult = $authService->register(
-    (string) $_POST['name'],
-    (string) $_POST['email'],
-    (string) $_POST['password']
-  );
-
-  $registeredUser = $registerResult['user'] ?? null;
-  if (!$registeredUser) {
-    return $registerResult['error'] ?? 'Não foi possível criar o usuário';
-  }
-
-  $authService->login($registeredUser);
-  return '';
-}

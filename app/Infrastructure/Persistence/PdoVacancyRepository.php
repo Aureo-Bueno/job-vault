@@ -2,151 +2,105 @@
 
 namespace App\Infrastructure\Persistence;
 
-use App\Db\Database;
-use App\Domain\Model\Vacancy;
-use App\Domain\Repository\VacancyRepositoryInterface;
-use App\Util\Logger;
-use App\Util\Uuid;
-use PDO;
+use App\Domain\Shared\PageRequest;
+use App\Domain\Vacancy\Vacancy;
+use App\Domain\Vacancy\VacancyDescription;
+use App\Domain\Vacancy\VacancyFilter;
+use App\Domain\Vacancy\VacancyId;
+use App\Domain\Vacancy\VacancyRepositoryInterface;
+use App\Domain\Vacancy\VacancyStatus;
+use App\Domain\Vacancy\VacancyTitle;
 
-class PdoVacancyRepository implements VacancyRepositoryInterface
+final class PdoVacancyRepository implements VacancyRepositoryInterface
 {
-  private Database $database;
-  private Logger $logger;
+  /** Legacy column values of `vacancies.is_active` */
+  private const ACTIVE = 's';
+  private const INACTIVE = 'n';
+  private const COLUMNS = 'id, title, description, is_active, created_at';
 
-  public function __construct()
+  public function __construct(private Database $db)
   {
-    $this->database = new Database('vacancies');
-    $this->logger = new Logger('vacancy');
   }
 
-  /** @return Vacancy[] */
-  public function findAll(
-    ?string $where = null,
-    ?string $order = null,
-    ?string $limit = null,
-    array $params = []
-  ): array
+  public function get(VacancyId $id): ?Vacancy
   {
-    try {
-      $statement = $this->database->select($where, $order, $limit, '*', $params);
-      $rows = $statement->fetchAll(PDO::FETCH_ASSOC);
-      return array_map([$this, 'mapRow'], $rows);
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to fetch vacancies', [
-        'error' => $e->getMessage(),
-        'where' => $where
-      ]);
-      throw $e;
-    }
+    $row = $this->db->fetchOne('SELECT ' . self::COLUMNS . ' FROM vacancies WHERE id = ?', [$id->value()]);
+    return $row ? $this->map($row) : null;
   }
 
-  public function findById(string $id): ?Vacancy
+  public function matching(VacancyFilter $filter, PageRequest $page): array
   {
-    try {
-      $statement = $this->database->execute('SELECT * FROM vacancies WHERE id = ?', [$id]);
-      $row = $statement->fetch(PDO::FETCH_ASSOC);
-      return $row ? $this->mapRow($row) : null;
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to fetch vacancy', [
-        'error' => $e->getMessage(),
-        'vacancy_id' => $id
-      ]);
-      throw $e;
-    }
+    [$where, $params] = $this->criteria($filter);
+    $rows = $this->db->fetchAll(
+      'SELECT ' . self::COLUMNS . ' FROM vacancies' . $where . ' ORDER BY created_at DESC, id ASC' . Sql::limit($page),
+      $params
+    );
+
+    return array_map([$this, 'map'], $rows);
   }
 
-  public function count(?string $where = null, array $params = []): int
+  public function countMatching(VacancyFilter $filter): int
   {
-    try {
-      return $this->database->count($where, $params);
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to count vacancies', [
-        'error' => $e->getMessage()
-      ]);
-      throw $e;
-    }
+    [$where, $params] = $this->criteria($filter);
+    return (int) $this->db->fetchValue('SELECT COUNT(*) FROM vacancies' . $where, $params);
   }
 
-  public function create(Vacancy $vacancy): Vacancy
+  public function save(Vacancy $vacancy): void
   {
-    try {
-      if ($vacancy->id === null) {
-        $vacancy->id = Uuid::generateV4();
-      }
+    $values = [
+      $vacancy->title()->value(),
+      $vacancy->description()->value(),
+      $vacancy->isOpen() ? self::ACTIVE : self::INACTIVE,
+      Sql::fromDate($vacancy->publishedAt()),
+      $vacancy->id()->value(),
+    ];
 
-      $this->database->insert([
-        'id' => $vacancy->id,
-        'title' => $vacancy->title,
-        'description' => $vacancy->description,
-        'is_active' => $vacancy->isActive,
-        'created_at' => $vacancy->createdAt
-      ]);
+    $exists = $this->db->fetchValue('SELECT 1 FROM vacancies WHERE id = ?', [$vacancy->id()->value()]);
+    $this->db->run(
+      $exists
+        ? 'UPDATE vacancies SET title = ?, description = ?, is_active = ?, created_at = ? WHERE id = ?'
+        : 'INSERT INTO vacancies (title, description, is_active, created_at, id) VALUES (?, ?, ?, ?, ?)',
+      $values
+    );
+  }
 
-      $this->logger->info('New vacancy created', [
-        'vacancy_id' => $vacancy->id,
-        'title' => $vacancy->title,
-        'status' => $vacancy->isActive
-      ]);
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to create vacancy', [
-        'error' => $e->getMessage(),
-        'title' => $vacancy->title
-      ]);
-      throw $e;
+  public function remove(VacancyId $id): void
+  {
+    $this->db->run('DELETE FROM vacancies WHERE id = ?', [$id->value()]);
+  }
+
+  /**
+   * @return array{0:string,1:array<string,string>}
+   */
+  private function criteria(VacancyFilter $filter): array
+  {
+    $conditions = [];
+    $params = [];
+
+    if ($filter->title !== null) {
+      $conditions[] = 'title LIKE :title';
+      $params['title'] = Sql::likePattern($filter->title);
     }
 
-    return $vacancy;
-  }
-
-  public function update(Vacancy $vacancy): bool
-  {
-    try {
-      $this->database->execute(
-        'UPDATE vacancies SET title = ?, description = ?, is_active = ?, created_at = ? WHERE id = ?',
-        [$vacancy->title, $vacancy->description, $vacancy->isActive, $vacancy->createdAt, $vacancy->id]
-      );
-
-      $this->logger->info('Vacancy updated', [
-        'vacancy_id' => $vacancy->id,
-        'title' => $vacancy->title
-      ]);
-
-      return true;
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to update vacancy', [
-        'error' => $e->getMessage(),
-        'vacancy_id' => $vacancy->id
-      ]);
-      throw $e;
+    if ($filter->status !== null) {
+      $conditions[] = 'is_active = :status';
+      $params['status'] = $filter->status->isActive() ? self::ACTIVE : self::INACTIVE;
     }
+
+    return [Sql::where($conditions), $params];
   }
 
-  public function delete(string $id): bool
+  /**
+   * @param array<string,mixed> $row
+   */
+  private function map(array $row): Vacancy
   {
-    try {
-      $this->database->execute('DELETE FROM vacancies WHERE id = ?', [$id]);
-      $this->logger->info('Vacancy deleted', [
-        'vacancy_id' => $id
-      ]);
-      return true;
-    } catch (\Throwable $e) {
-      $this->logger->error('Failed to delete vacancy', [
-        'error' => $e->getMessage(),
-        'vacancy_id' => $id
-      ]);
-      throw $e;
-    }
-  }
-
-  private function mapRow(array $row): Vacancy
-  {
-    return new Vacancy(
-      isset($row['id']) ? (string) $row['id'] : null,
-      $row['title'] ?? '',
-      $row['description'] ?? '',
-      $row['is_active'] ?? 'n',
-      $row['created_at'] ?? ''
+    return Vacancy::reconstitute(
+      VacancyId::fromString((string) $row['id']),
+      VacancyTitle::fromString((string) $row['title']),
+      VacancyDescription::fromString((string) $row['description']),
+      VacancyStatus::fromBool(($row['is_active'] ?? self::INACTIVE) === self::ACTIVE),
+      Sql::toDate($row['created_at'] ?? null)
     );
   }
 }

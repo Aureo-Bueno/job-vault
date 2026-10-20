@@ -6,17 +6,17 @@ use App\Application\Abstractions\Command;
 use App\Application\Abstractions\CommandHandlerInterface;
 use App\Application\Commands\Vacancies\CreateVacancyCommand;
 use App\Application\DTOs\VacancyDto;
-use App\Application\Mappings\VacancyMapping;
-use App\Application\Service\VacancyService;
-use App\Domain\Model\Vacancy;
+use App\Domain\Vacancy\Vacancy;
+use App\Domain\Vacancy\VacancyDescription;
+use App\Domain\Vacancy\VacancyId;
+use App\Domain\Vacancy\VacancyRepositoryInterface;
+use App\Domain\Vacancy\VacancyStatus;
+use App\Domain\Vacancy\VacancyTitle;
 use InvalidArgumentException;
 
-/**
- * Handles vacancy creation command.
- */
 final class CreateVacancyHandler implements CommandHandlerInterface
 {
-  public function __construct(private VacancyService $vacancyService)
+  public function __construct(private VacancyRepositoryInterface $vacancies)
   {
   }
 
@@ -28,16 +28,17 @@ final class CreateVacancyHandler implements CommandHandlerInterface
   public function handle(Command $command): VacancyDto
   {
     if (!$command instanceof CreateVacancyCommand) {
-      throw new InvalidArgumentException('Invalid command for CreateVacancyHandler.');
+      throw new InvalidArgumentException('Invalid command for ' . self::class);
     }
 
-    $vacancy = new Vacancy();
-    $vacancy->title = $command->title;
-    $vacancy->description = $command->description;
-    $vacancy->isActive = $command->isActive;
+    $vacancy = Vacancy::publish(
+      VacancyId::generate(),
+      VacancyTitle::fromString($command->title),
+      VacancyDescription::fromString($command->description),
+      VacancyStatus::fromBool($command->active)
+    );
+    $this->vacancies->save($vacancy);
 
-    $created = $this->vacancyService->create($vacancy);
-
-    return VacancyMapping::toDto($created);
+    return VacancyDto::fromVacancy($vacancy);
   }
 }

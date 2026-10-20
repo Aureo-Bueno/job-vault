@@ -5,17 +5,26 @@ namespace App\Application\Features\Applications;
 use App\Application\Abstractions\Command;
 use App\Application\Abstractions\CommandHandlerInterface;
 use App\Application\Commands\Applications\ApplyToVacancyCommand;
-use App\Application\DTOs\ApplicationResultDto;
-use App\Application\Service\ApplicationService;
+use App\Application\Exceptions\NotFoundException;
+use App\Application\Exceptions\UnauthorizedException;
+use App\Application\Security\CurrentUserProvider;
+use App\Domain\JobApplication\AlreadyAppliedException;
+use App\Domain\JobApplication\JobApplicationRepositoryInterface;
+use App\Domain\User\UserId;
+use App\Domain\Vacancy\VacancyId;
+use App\Domain\Vacancy\VacancyRepositoryInterface;
 use InvalidArgumentException;
 
 /**
- * Handles user application to a vacancy.
+ * The current user applies to an open vacancy (once).
  */
 final class ApplyToVacancyHandler implements CommandHandlerInterface
 {
-  public function __construct(private ApplicationService $applicationService)
-  {
+  public function __construct(
+    private VacancyRepositoryInterface $vacancies,
+    private JobApplicationRepositoryInterface $applications,
+    private CurrentUserProvider $currentUser
+  ) {
   }
 
   public function commandClass(): string
@@ -23,18 +32,27 @@ final class ApplyToVacancyHandler implements CommandHandlerInterface
     return ApplyToVacancyCommand::class;
   }
 
-  public function handle(Command $command): ApplicationResultDto
+  public function handle(Command $command): void
   {
     if (!$command instanceof ApplyToVacancyCommand) {
-      throw new InvalidArgumentException('Invalid command for ApplyToVacancyHandler.');
+      throw new InvalidArgumentException('Invalid command for ' . self::class);
     }
 
-    $status = $this->applicationService->apply($command->userId, $command->vacancyId);
+    $current = $this->currentUser->currentUser();
+    if ($current === null) {
+      throw new UnauthorizedException('Você precisa entrar para continuar.');
+    }
 
-    return new ApplicationResultDto(
-      $status,
-      $command->userId,
-      $command->vacancyId
-    );
+    $candidateId = UserId::fromString($current->id);
+    $vacancy = $this->vacancies->get(VacancyId::fromString($command->vacancyId));
+    if ($vacancy === null) {
+      throw new NotFoundException('Vaga não encontrada.');
+    }
+
+    if ($this->applications->exists($candidateId, $vacancy->id())) {
+      throw new AlreadyAppliedException();
+    }
+
+    $this->applications->save($vacancy->receiveApplicationFrom($candidateId));
   }
 }

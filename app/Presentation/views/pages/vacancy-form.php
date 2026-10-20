@@ -1,6 +1,7 @@
 <?php
-$tituloFormulario = $tituloPagina ?? (defined('TITLE') ? TITLE : 'Formulário de vaga');
-$isActiveValue = $vacancy->isActive ?? 's';
+// Expecting: $vacancy (object with title, description, isActive), $tituloPagina, $alerta
+$tituloFormulario = $tituloPagina ?? 'Formulário de vaga';
+$isActive = (bool) ($vacancy->isActive ?? true);
 ?>
 
 <section class="container-content page-section p-3 p-lg-4">
@@ -14,10 +15,18 @@ $isActiveValue = $vacancy->isActive ?? 's';
     </a>
   </div>
 
+  <?php if (!empty($alerta)) : ?>
+    <div class="alert alert-<?= htmlspecialchars($alerta['tipo']) ?> alert-dismissible fade show mb-4" role="alert" data-auto-close="true">
+      <i class="<?= htmlspecialchars($alerta['icone']) ?> me-1"></i>
+      <?= htmlspecialchars($alerta['mensagem']) ?>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+    </div>
+  <?php endif; ?>
+
   <div class="card">
     <div class="card-body p-4 p-lg-5">
       <form method="POST" class="needs-validation" novalidate>
-        <?= \App\Util\Csrf::input() ?>
+        <?= \App\Presentation\Support\Csrf::input() ?>
 
         <div class="mb-4">
           <label for="title" class="form-label">
@@ -55,14 +64,14 @@ $isActiveValue = $vacancy->isActive ?? 's';
           <label class="form-label"><i class="bi bi-toggle-on"></i> Status da vaga</label>
           <div class="row g-2">
             <div class="col-12 col-md-6">
-              <input type="radio" class="btn-check" name="is_active" id="active-yes" value="s" <?= $isActiveValue === 's' ? 'checked' : '' ?>>
+              <input type="radio" class="btn-check" name="vacancy_status" id="active-yes" value="active" <?= $isActive ? 'checked' : '' ?>>
               <label class="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center" for="active-yes">
                 <span><i class="bi bi-check-circle-fill text-success me-1"></i> Ativa</span>
                 <small class="text-muted">Visível para candidatos</small>
               </label>
             </div>
             <div class="col-12 col-md-6">
-              <input type="radio" class="btn-check" name="is_active" id="active-no" value="n" <?= $isActiveValue === 'n' ? 'checked' : '' ?>>
+              <input type="radio" class="btn-check" name="vacancy_status" id="active-no" value="inactive" <?= !$isActive ? 'checked' : '' ?>>
               <label class="btn btn-outline-secondary w-100 d-flex justify-content-between align-items-center" for="active-no">
                 <span><i class="bi bi-pause-circle-fill text-danger me-1"></i> Inativa</span>
                 <small class="text-muted">Oculta para candidatos</small>

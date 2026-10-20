@@ -1,0 +1,107 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same branch/PR cancels the run that is still going.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PHP_VERSION: '8.2' # same as the Docker image (php:8.2-apache)
+  PHP_EXTENSIONS: mbstring, pdo_mysql, pdo_sqlite
+
+jobs:
+  unit:
+    name: Lint + unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: ${{ env.PHP_EXTENSIONS }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Validate composer.json / composer.lock
+        run: composer validate --no-check-publish --no-check-all
+
+      - name: Install dependencies (cached)
+        uses: ramsey/composer-install@v3
+
+      - name: PHP syntax check
+        run: |
+          { find app database tests public routes.php -name '*.php' -print0; printf '%s\0' bin/migrate bin/console; } \
+            | xargs -0 -n1 -P4 php -l > /dev/null
+
+      - name: Unit tests
+        run: vendor/bin/phpunit --testsuite Unit
+
+  integration:
+    name: Migrations + integration tests (MySQL 8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: myapp_db
+          MYSQL_USER: appuser
+          MYSQL_PASSWORD: app_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: myapp_db
+      DB_USER: appuser
+      DB_PASSWORD: app_password
+      RUN_INTEGRATION: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: ${{ env.PHP_EXTENSIONS }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies (cached)
+        uses: ramsey/composer-install@v3
+
+      - name: Apply migrations (schema + seeds)
+        run: php bin/migrate migrate
+
+      - name: Integration tests
+        run: vendor/bin/phpunit --testsuite Integration
+
+      # Every migration must be reversible: revert all of them and apply them again.
+      - name: Migrations round trip (reset + migrate)
+        run: |
+          php bin/migrate reset
+          php bin/migrate migrate
+          php bin/migrate status
+
+      - name: Scheduler job runs against the seeded database
+        run: php bin/console vacancies:close-expired
